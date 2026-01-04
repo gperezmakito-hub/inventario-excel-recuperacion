@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitudes de Compra - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Solicitudes de Compra</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-cart3 me-2"></i>Solicitudes de Compra</h2>
+    <a href="{{ url_for('compras.nueva') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> Nueva Solicitud
+    </a>
+</div>
+
+<!-- Tabs de estados -->
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link {% if not estado_filtro %}active{% endif %}" 
+           href="{{ url_for('compras.listar') }}">
+            Todas
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if estado_filtro == 'pendiente' %}active{% endif %}" 
+           href="{{ url_for('compras.listar', estado='pendiente') }}">
+            Pendientes
+            {% if contadores.get('pendiente', 0) > 0 %}
+            <span class="badge bg-warning text-dark">{{ contadores.pendiente }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if estado_filtro == 'aprobada' %}active{% endif %}" 
+           href="{{ url_for('compras.listar', estado='aprobada') }}">
+            Aprobadas
+            {% if contadores.get('aprobada', 0) > 0 %}
+            <span class="badge bg-info">{{ contadores.aprobada }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if estado_filtro == 'pedida' %}active{% endif %}" 
+           href="{{ url_for('compras.listar', estado='pedida') }}">
+            Pedidas
+            {% if contadores.get('pedida', 0) > 0 %}
+            <span class="badge bg-primary">{{ contadores.pedida }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if estado_filtro == 'en_transito' %}active{% endif %}" 
+           href="{{ url_for('compras.listar', estado='en_transito') }}">
+            En Tránsito
+            {% if contadores.get('en_transito', 0) > 0 %}
+            <span class="badge bg-secondary">{{ contadores.en_transito }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if estado_filtro == 'recibida' %}active{% endif %}" 
+           href="{{ url_for('compras.listar', estado='recibida') }}">
+            Recibidas
+        </a>
+    </li>
+</ul>
+
+<!-- Tabla de solicitudes -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Número</th>
+                    <th>Estado</th>
+                    <th>Prioridad</th>
+                    <th>Proveedor</th>
+                    <th>Productos</th>
+                    <th class="text-end">Total Est.</th>
+                    <th>Solicitado por</th>
+                    <th>Fecha</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sol in solicitudes.items %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('compras.ver', id=sol.id) }}" class="text-decoration-none fw-bold">
+                            {{ sol.numero }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="badge bg-{{ sol.estado_color }}">{{ sol.estado|upper }}</span>
+                    </td>
+                    <td>
+                        {% if sol.prioridad == 'urgente' %}
+                        <span class="badge bg-danger">URGENTE</span>
+                        {% elif sol.prioridad == 'alta' %}
+                        <span class="badge bg-warning text-dark">ALTA</span>
+                        {% else %}
+                        <span class="text-muted">Normal</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ sol.proveedor.nombre if sol.proveedor else '-' }}</td>
+                    <td class="text-center">{{ sol.lineas.count() }}</td>
+                    <td class="text-end">{{ "%.2f"|format(sol.total_estimado) }}€</td>
+                    <td>
+                        <small>{{ sol.creador.nombre_completo if sol.creador else '-' }}</small>
+                    </td>
+                    <td>
+                        <small>{{ sol.fecha_creacion.strftime('%d/%m/%Y') }}</small>
+                    </td>
+                    <td class="text-end">
+                        <a href="{{ url_for('compras.ver', id=sol.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center py-4 text-muted">
+                        No hay solicitudes
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación -->
+    {% if solicitudes.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if solicitudes.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('compras.listar', page=solicitudes.prev_num, estado=estado_filtro) }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page in solicitudes.iter_pages() %}
+                    {% if page %}
+                    <li class="page-item {% if page == solicitudes.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('compras.listar', page=page, estado=estado_filtro) }}">
+                            {{ page }}
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if solicitudes.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('compras.listar', page=solicitudes.next_num, estado=estado_filtro) }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

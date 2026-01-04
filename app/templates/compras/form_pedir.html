@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Pedido - Solicitud #{{ solicitud.id }}{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Compras</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.ver', id=solicitud.id) }}">#{{ solicitud.id }}</a></li>
+    <li class="breadcrumb-item active">Registrar Pedido</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-primary bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-truck text-primary me-2"></i>
+                    Registrar Pedido al Proveedor
+                </h5>
+            </div>
+            
+            <form method="POST" action="{{ url_for('compras.pedir', id=solicitud.id) }}">
+                <div class="card-body">
+                    <!-- Resumen de la solicitud -->
+                    <div class="alert alert-info">
+                        <strong>Solicitud #{{ solicitud.id }}</strong> aprobada el 
+                        {{ solicitud.fecha_aprobacion.strftime('%d/%m/%Y') if solicitud.fecha_aprobacion else 'N/A' }}
+                        {% if solicitud.aprobador %}
+                        por {{ solicitud.aprobador.nombre_completo }}
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Productos aprobados -->
+                    <h6 class="mb-3">Productos a pedir:</h6>
+                    <table class="table table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Cantidad Aprobada</th>
+                                <th class="text-end">Precio Est.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linea in solicitud.lineas %}
+                            <tr>
+                                <td>
+                                    {{ linea.producto.nombre }}
+                                    <br><small class="text-muted">{{ linea.producto.color or '' }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <strong>{{ linea.cantidad_aprobada or linea.cantidad_solicitada }}</strong>
+                                </td>
+                                <td class="text-end">
+                                    {{ "%.2f"|format((linea.producto.precio_compra or 0) * (linea.cantidad_aprobada or linea.cantidad_solicitada)) }}€
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    
+                    <hr>
+                    
+                    <!-- Datos del pedido -->
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Proveedor</label>
+                            {% set primer_producto = solicitud.lineas[0].producto if solicitud.lineas else None %}
+                            <select class="form-select" name="proveedor_id">
+                                {% for prov in proveedores %}
+                                <option value="{{ prov.id }}" 
+                                        {% if primer_producto and primer_producto.proveedor_id == prov.id %}selected{% endif %}>
+                                    {{ prov.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Nº Pedido Interno</label>
+                            <input type="text" class="form-control" name="numero_pedido" 
+                                   value="PED-{{ solicitud.id }}-{{ now.strftime('%Y%m%d') }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha estimada de llegada</label>
+                            <input type="date" class="form-control" name="fecha_estimada">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Método de envío</label>
+                            <select class="form-select" name="metodo_envio">
+                                <option value="">Sin especificar</option>
+                                <option value="transporte">Transporte proveedor</option>
+                                <option value="recogida">Recogida propia</option>
+                                <option value="mensajeria">Mensajería</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Notas del pedido</label>
+                            <textarea class="form-control" name="notas" rows="3" 
+                                      placeholder="Instrucciones especiales, dirección de entrega, etc."></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('compras.ver', id=solicitud.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-truck me-1"></i> Registrar Pedido
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

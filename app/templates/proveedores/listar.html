@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Proveedores - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Proveedores</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-building me-2"></i>Proveedores</h2>
+    {% if current_user.puede_editar_productos() %}
+    <a href="{{ url_for('proveedores.nuevo') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> Nuevo Proveedor
+    </a>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    {% for proveedor in proveedores.items %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-building me-2 text-primary"></i>
+                    {{ proveedor.nombre }}
+                </h5>
+                
+                {% if proveedor.nif %}
+                <p class="mb-1"><small class="text-muted">NIF:</small> {{ proveedor.nif }}</p>
+                {% endif %}
+                
+                {% if proveedor.direccion %}
+                <p class="mb-1">
+                    <i class="bi bi-geo-alt text-muted me-1"></i>
+                    <small>{{ proveedor.direccion }}</small>
+                </p>
+                {% endif %}
+                
+                {% if proveedor.telefono %}
+                <p class="mb-1">
+                    <i class="bi bi-telephone text-muted me-1"></i>
+                    <a href="tel:{{ proveedor.telefono }}">{{ proveedor.telefono }}</a>
+                </p>
+                {% endif %}
+                
+                {% if proveedor.email %}
+                <p class="mb-1">
+                    <i class="bi bi-envelope text-muted me-1"></i>
+                    <a href="mailto:{{ proveedor.email }}">{{ proveedor.email }}</a>
+                </p>
+                {% endif %}
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="bi bi-box me-1"></i>
+                        {{ proveedor.productos.count() }} productos
+                    </small>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('proveedores.ver', id=proveedor.id) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        {% if current_user.puede_editar_productos() %}
+                        <a href="{{ url_for('proveedores.editar', id=proveedor.id) }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            No hay proveedores registrados. 
+            {% if current_user.puede_editar_productos() %}
+            <a href="{{ url_for('proveedores.nuevo') }}">Agregar el primero</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

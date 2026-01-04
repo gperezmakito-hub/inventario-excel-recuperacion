@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block title %}{{ solicitud.numero }} - Solicitud de Compra{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Solicitudes</a></li>
+    <li class="breadcrumb-item active">{{ solicitud.numero }}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">{{ solicitud.numero }}</h2>
+        <span class="badge bg-{{ solicitud.estado_color }} fs-6">{{ solicitud.estado|upper }}</span>
+        {% if solicitud.prioridad == 'urgente' %}
+        <span class="badge bg-danger fs-6">URGENTE</span>
+        {% elif solicitud.prioridad == 'alta' %}
+        <span class="badge bg-warning text-dark fs-6">ALTA</span>
+        {% endif %}
+    </div>
+    
+    <!-- Acciones según estado -->
+    <div class="btn-group">
+        {% if solicitud.puede_aprobar() and current_user.puede_aprobar() %}
+        <a href="{{ url_for('compras.aprobar', id=solicitud.id) }}" class="btn btn-success">
+            <i class="bi bi-check-lg me-1"></i> Aprobar
+        </a>
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalRechazar">
+            <i class="bi bi-x-lg me-1"></i> Rechazar
+        </button>
+        {% endif %}
+        
+        {% if solicitud.puede_pedir() and current_user.puede_aprobar() %}
+        <a href="{{ url_for('compras.pedir', id=solicitud.id) }}" class="btn btn-primary">
+            <i class="bi bi-send me-1"></i> Registrar Pedido
+        </a>
+        {% endif %}
+        
+        {% if solicitud.puede_marcar_enviado() %}
+        <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#modalEnviado">
+            <i class="bi bi-truck me-1"></i> Marcar Enviado
+        </button>
+        {% endif %}
+        
+        {% if solicitud.puede_recibir() %}
+        <a href="{{ url_for('compras.recibir', id=solicitud.id) }}" class="btn btn-success">
+            <i class="bi bi-box-seam me-1"></i> Registrar Recepción
+        </a>
+        {% endif %}
+        
+        {% if solicitud.estado not in ['recibida', 'cancelada'] %}
+        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalCancelar">
+            <i class="bi bi-x-circle me-1"></i> Cancelar
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Progress Bar del Workflow -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="position-relative">
+            <div class="progress" style="height: 4px;">
+                {% set progreso = {'pendiente': 20, 'aprobada': 40, 'pedida': 60, 'en_transito': 80, 'recibida': 100, 'rechazada': 0, 'cancelada': 0} %}
+                <div class="progress-bar bg-{{ solicitud.estado_color }}" style="width: {{ progreso[solicitud.estado] }}%"></div>
+            </div>
+            <div class="d-flex justify-content-between mt-2">
+                <div class="text-center">
+                    <div class="rounded-circle bg-{{ 'primary' if solicitud.estado != 'pendiente' else 'warning' }} text-white d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px">
+                        <i class="bi bi-file-earmark-plus"></i>
+                    </div>
+                    <small class="d-block mt-1">Solicitud</small>
+                </div>
+                <div class="text-center">
+                    <div class="rounded-circle bg-{{ 'success' if solicitud.estado in ['aprobada', 'pedida', 'en_transito', 'recibida'] else 'secondary' }} text-white d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                    <small class="d-block mt-1">Aprobación</small>
+                </div>
+                <div class="text-center">
+                    <div class="rounded-circle bg-{{ 'primary' if solicitud.estado in ['pedida', 'en_transito', 'recibida'] else 'secondary' }} text-white d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px">
+                        <i class="bi bi-send"></i>
+                    </div>
+                    <small class="d-block mt-1">Pedido</small>
+                </div>
+                <div class="text-center">
+                    <div class="rounded-circle bg-{{ 'info' if solicitud.estado in ['en_transito', 'recibida'] else 'secondary' }} text-white d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px">
+                        <i class="bi bi-truck"></i>
+                    </div>
+                    <small class="d-block mt-1">Envío</small>
+                </div>
+                <div class="text-center">
+                    <div class="rounded-circle bg-{{ 'success' if solicitud.estado == 'recibida' else 'secondary' }} text-white d-inline-flex align-items-center justify-content-center" style="width:32px;height:32px">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <small class="d-block mt-1">Recepción</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Información principal -->
+    <div class="col-lg-8">
+        <!-- Productos -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Productos Solicitados</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Producto</th>
+                            <th class="text-center">Solicitado</th>
+                            <th class="text-center">Aprobado</th>
+                            <th class="text-center">Recibido</th>
+                            <th class="text-end">Precio Est.</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linea in lineas %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('productos.ver', id=linea.producto.id) }}">
+                                    {{ linea.producto.nombre }}
+                                </a>
+                                <br>
+                                <small class="text-muted">{{ linea.producto.color or '' }}</small>
+                            </td>
+                            <td class="text-center">{{ linea.cantidad_solicitada }}</td>
+                            <td class="text-center">
+                                {{ linea.cantidad_aprobada if linea.cantidad_aprobada else '-' }}
+                            </td>
+                            <td class="text-center">
+                                {% if linea.cantidad_recibida %}
+                                <span class="badge bg-success">{{ linea.cantidad_recibida }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(linea.precio_estimado or 0) }}€</td>
+                            <td class="text-end">{{ "%.2f"|format(linea.subtotal) }}€</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <th colspan="5" class="text-end">TOTAL ESTIMADO:</th>
+                            <th class="text-end">{{ "%.2f"|format(solicitud.total_estimado) }}€</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Historial -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Historial</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for h in historial %}
+                    <div class="timeline-item">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ h.accion }}</strong>
+                            <small class="text-muted">{{ h.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                        </div>
+                        {% if h.usuario %}
+                        <small class="text-muted">Por: {{ h.usuario.nombre_completo }}</small>
+                        {% endif %}
+                        {% if h.notas %}
+                        <p class="mb-0 mt-1"><small>{{ h.notas }}</small></p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Panel lateral -->
+    <div class="col-lg-4">
+        <!-- Info general -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">Información General</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Proveedor:</th>
+                        <td>
+                            {% if solicitud.proveedor %}
+                            <a href="{{ url_for('proveedores.ver', id=solicitud.proveedor.id) }}">
+                                {{ solicitud.proveedor.nombre }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Sin asignar</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Solicitado por:</th>
+                        <td>{{ solicitud.creador.nombre_completo if solicitud.creador else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Fecha solicitud:</th>
+                        <td>{{ solicitud.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                    {% if solicitud.motivo %}
+                    <tr>
+                        <th class="text-muted">Motivo:</th>
+                        <td>{{ solicitud.motivo }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        
+        <!-- Aprobación -->
+        {% if solicitud.fecha_aprobacion %}
+        <div class="card mb-4">
+            <div class="card-header bg-{{ 'success' if solicitud.estado != 'rechazada' else 'danger' }} bg-opacity-10">
+                <h6 class="mb-0">
+                    <i class="bi bi-{{ 'check-circle' if solicitud.estado != 'rechazada' else 'x-circle' }} me-1"></i>
+                    Aprobación
+                </h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Por:</th>
+                        <td>{{ solicitud.aprobador.nombre_completo if solicitud.aprobador else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Fecha:</th>
+                        <td>{{ solicitud.fecha_aprobacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                    {% if solicitud.notas_aprobacion %}
+                    <tr>
+                        <th class="text-muted">Notas:</th>
+                        <td>{{ solicitud.notas_aprobacion }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Pedido -->
+        {% if solicitud.fecha_pedido %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary bg-opacity-10">
+                <h6 class="mb-0"><i class="bi bi-send me-1"></i>Pedido</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Fecha pedido:</th>
+                        <td>{{ solicitud.fecha_pedido.strftime('%d/%m/%Y') }}</td>
+                    </tr>
+                    {% if solicitud.numero_pedido_proveedor %}
+                    <tr>
+                        <th class="text-muted">Nº Pedido:</th>
+                        <td><code>{{ solicitud.numero_pedido_proveedor }}</code></td>
+                    </tr>
+                    {% endif %}
+                    {% if solicitud.fecha_entrega_estimada %}
+                    <tr>
+                        <th class="text-muted">Entrega est.:</th>
+                        <td>{{ solicitud.fecha_entrega_estimada.strftime('%d/%m/%Y') }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Envío -->
+        {% if solicitud.fecha_envio_proveedor %}
+        <div class="card mb-4">
+            <div class="card-header bg-info bg-opacity-10">
+                <h6 class="mb-0"><i class="bi bi-truck me-1"></i>Envío</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Fecha envío:</th>
+                        <td>{{ solicitud.fecha_envio_proveedor.strftime('%d/%m/%Y') }}</td>
+                    </tr>
+                    {% if solicitud.numero_seguimiento %}
+                    <tr>
+                        <th class="text-muted">Seguimiento:</th>
+                        <td><code>{{ solicitud.numero_seguimiento }}</code></td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Recepción -->
+        {% if solicitud.fecha_recepcion %}
+        <div class="card mb-4">
+            <div class="card-header bg-success bg-opacity-10">
+                <h6 class="mb-0"><i class="bi bi-box-seam me-1"></i>Recepción</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Fecha:</th>
+                        <td>{{ solicitud.fecha_recepcion.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                    {% if solicitud.notas_recepcion %}
+                    <tr>
+                        <th class="text-muted">Notas:</th>
+                        <td>{{ solicitud.notas_recepcion }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Rechazar -->
+<div class="modal fade" id="modalRechazar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('compras.rechazar', id=solicitud.id) }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Rechazar Solicitud</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Motivo del rechazo</label>
+                        <textarea class="form-control" name="motivo_rechazo" rows="3" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Rechazar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Marcar Enviado -->
+<div class="modal fade" id="modalEnviado" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('compras.marcar_enviado', id=solicitud.id) }}">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">Marcar como Enviado</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Número de seguimiento</label>
+                        <input type="text" class="form-control" name="numero_seguimiento">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Fecha entrega estimada</label>
+                        <input type="date" class="form-control" name="fecha_entrega_estimada">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cancelar -->
+<div class="modal fade" id="modalCancelar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('compras.cancelar', id=solicitud.id) }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Cancelar Solicitud</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Estás seguro de que quieres cancelar esta solicitud?</p>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo (opcional)</label>
+                        <textarea class="form-control" name="motivo" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Volver</button>
+                    <button type="submit" class="btn btn-danger">Sí, Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

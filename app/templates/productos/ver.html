@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{{ producto.nombre }} - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('productos.listar') }}">Productos</a></li>
+    <li class="breadcrumb-item active">{{ producto.codigo_ean }}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>{{ producto.nombre }}</h2>
+    <div>
+        {% if producto.stock_bajo %}
+        <a href="{{ url_for('compras.solicitud_rapida', producto_id=producto.id) }}" class="btn btn-warning">
+            <i class="bi bi-cart-plus me-1"></i> Solicitar Compra
+        </a>
+        {% endif %}
+        {% if current_user.puede_editar_productos() %}
+        <a href="{{ url_for('productos.editar', id=producto.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i> Editar
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Información Principal -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Información del Producto</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th class="text-muted" style="width:40%">Código EAN:</th>
+                                <td><code class="fs-5">{{ producto.codigo_ean }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Código Proveedor:</th>
+                                <td>{{ producto.codigo_proveedor or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Nombre:</th>
+                                <td>{{ producto.nombre }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Color:</th>
+                                <td>{{ producto.color or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Peso Unidad:</th>
+                                <td>{{ producto.peso_unidad or '-' }} kg</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <th class="text-muted" style="width:40%">Categoría:</th>
+                                <td>{{ producto.categoria.nombre if producto.categoria else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Zona Stock:</th>
+                                <td>{{ producto.zona.nombre if producto.zona else '-' }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Proveedor:</th>
+                                <td>
+                                    {% if producto.proveedor %}
+                                    <a href="{{ url_for('proveedores.ver', id=producto.proveedor.id) }}">
+                                        {{ producto.proveedor.nombre }}
+                                    </a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-muted">Estado:</th>
+                                <td>
+                                    {% if producto.activo %}
+                                    <span class="badge bg-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inactivo</span>
+                                    {% endif %}
+                                    {% if producto.descatalogado %}
+                                    <span class="badge bg-warning text-dark">Descatalogado</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Últimos Movimientos -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-success bg-opacity-10">
+                        <h6 class="mb-0">
+                            <i class="bi bi-box-arrow-in-down text-success me-2"></i>
+                            Últimas Entradas
+                        </h6>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for entrada in ultimas_entradas %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <small class="text-muted">{{ entrada.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    <br>
+                                    <small>{{ entrada.proveedor.nombre if entrada.proveedor else '-' }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-success fs-6">+{{ entrada.cantidad }}</span>
+                                    <br>
+                                    <small class="text-muted">{{ "%.2f"|format(entrada.precio_total) }}€</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="list-group-item text-muted text-center">Sin entradas</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-danger bg-opacity-10">
+                        <h6 class="mb-0">
+                            <i class="bi bi-box-arrow-up text-danger me-2"></i>
+                            Últimas Salidas
+                        </h6>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        {% for salida in ultimas_salidas %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <small class="text-muted">{{ salida.fecha.strftime('%d/%m/%Y %H:%M') }}</small>
+                                    <br>
+                                    <small>{{ salida.destino or '-' }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-danger fs-6">-{{ salida.cantidad }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="list-group-item text-muted text-center">Sin salidas</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Panel Lateral -->
+    <div class="col-lg-4">
+        <!-- Stock -->
+        <div class="card mb-4 {% if producto.stock_actual == 0 %}border-danger{% elif producto.stock_bajo %}border-warning{% else %}border-success{% endif %}">
+            <div class="card-header {% if producto.stock_actual == 0 %}bg-danger{% elif producto.stock_bajo %}bg-warning{% else %}bg-success{% endif %} text-white">
+                <h5 class="mb-0 text-center">STOCK</h5>
+            </div>
+            <div class="card-body text-center">
+                <h1 class="display-3 {% if producto.stock_actual == 0 %}text-danger{% elif producto.stock_bajo %}text-warning{% else %}text-success{% endif %}">
+                    {{ producto.stock_actual }}
+                </h1>
+                <p class="text-muted mb-0">Mínimo: {{ producto.stock_minimo }}</p>
+                
+                {% if producto.stock_bajo %}
+                <div class="alert alert-warning mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    ¡Stock por debajo del mínimo!
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('movimientos.nueva_entrada', producto_id=producto.id) }}" 
+                       class="btn btn-success">
+                        <i class="bi bi-box-arrow-in-down me-1"></i> Registrar Entrada
+                    </a>
+                    <a href="{{ url_for('movimientos.nueva_salida', producto_id=producto.id) }}" 
+                       class="btn btn-danger">
+                        <i class="bi bi-box-arrow-up me-1"></i> Registrar Salida
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Precios -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-currency-euro me-2"></i>Precios</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <th class="text-muted">Precio Compra:</th>
+                        <td class="text-end fs-5">{{ "%.2f"|format(producto.precio_compra or 0) }}€</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Dto. 1:</th>
+                        <td class="text-end">{{ producto.dto_1 or 0 }}%</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Dto. 2:</th>
+                        <td class="text-end">{{ producto.dto_2 or 0 }}%</td>
+                    </tr>
+                    <tr class="border-top">
+                        <th class="text-muted">Valor Stock:</th>
+                        <td class="text-end fs-5 text-primary">{{ "%.2f"|format(producto.valor_inventario) }}€</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Fechas -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-calendar3 me-2"></i>Fechas</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless table-sm mb-0">
+                    <tr>
+                        <th class="text-muted">Creación:</th>
+                        <td>{{ producto.fecha_creacion.strftime('%d/%m/%Y') if producto.fecha_creacion else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Última Entrada:</th>
+                        <td>{{ producto.fecha_ultima_entrada.strftime('%d/%m/%Y') if producto.fecha_ultima_entrada else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Última Salida:</th>
+                        <td>{{ producto.fecha_ultima_salida.strftime('%d/%m/%Y') if producto.fecha_ultima_salida else '-' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

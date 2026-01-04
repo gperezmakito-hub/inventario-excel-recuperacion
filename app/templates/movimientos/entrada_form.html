@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Entrada - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('movimientos.listar_entradas') }}">Entradas</a></li>
+    <li class="breadcrumb-item active">Nueva</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-success bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-box-arrow-in-down text-success me-2"></i>
+                    Registrar Entrada de Inventario
+                </h5>
+            </div>
+            
+            <form method="POST">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- Producto -->
+                        <div class="col-12">
+                            <label class="form-label">Producto *</label>
+                            {% if producto_preseleccionado %}
+                            <input type="hidden" name="producto_id" value="{{ producto_preseleccionado.id }}">
+                            <input type="text" class="form-control" 
+                                   value="{{ producto_preseleccionado.nombre }} - {{ producto_preseleccionado.color or '' }}" 
+                                   readonly>
+                            <small class="text-muted">
+                                Stock actual: {{ producto_preseleccionado.stock_actual }} | 
+                                Precio: {{ "%.2f"|format(producto_preseleccionado.precio_compra or 0) }}€
+                            </small>
+                            {% else %}
+                            <input type="hidden" name="producto_id" id="producto_id">
+                            <input type="text" class="form-control" id="producto_buscar" 
+                                   placeholder="Buscar por código o nombre..." autocomplete="off">
+                            <div class="dropdown-menu w-100" id="producto_dropdown"></div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">Cantidad *</label>
+                            <input type="number" class="form-control" name="cantidad" min="1" value="1" required>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">Precio Unitario (€)</label>
+                            <input type="number" step="0.01" class="form-control" name="precio_unitario" id="precio_unitario"
+                                   value="{{ producto_preseleccionado.precio_compra if producto_preseleccionado else '' }}">
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">Proveedor</label>
+                            <select class="form-select" name="proveedor_id">
+                                <option value="">-- Seleccionar --</option>
+                                {% for prov in proveedores %}
+                                <option value="{{ prov.id }}" 
+                                        {% if producto_preseleccionado and producto_preseleccionado.proveedor_id == prov.id %}selected{% endif %}>
+                                    {{ prov.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Nº Albarán</label>
+                            <input type="text" class="form-control" name="albaran">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Nº Factura</label>
+                            <input type="text" class="form-control" name="factura">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Dto. 1 (%)</label>
+                            <input type="number" step="0.01" class="form-control" name="dto_1" value="0">
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">Dto. 2 (%)</label>
+                            <input type="number" step="0.01" class="form-control" name="dto_2" value="0">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" name="actualizar_precio" id="actualizar_precio">
+                                <label class="form-check-label" for="actualizar_precio">
+                                    Actualizar precio del producto
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Notas</label>
+                            <textarea class="form-control" name="notas" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('movimientos.listar_entradas') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i> Registrar Entrada
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const input = document.getElementById('producto_buscar');
+const dropdown = document.getElementById('producto_dropdown');
+const hiddenId = document.getElementById('producto_id');
+const precioInput = document.getElementById('precio_unitario');
+
+if (input) {
+    input.addEventListener('input', async function() {
+        const q = this.value.trim();
+        if (q.length < 2) {
+            dropdown.classList.remove('show');
+            return;
+        }
+        
+        const response = await fetch(`/productos/api/buscar?q=${encodeURIComponent(q)}`);
+        const productos = await response.json();
+        
+        dropdown.innerHTML = '';
+        productos.forEach(p => {
+            const item = document.createElement('a');
+            item.className = 'dropdown-item';
+            item.href = '#';
+            item.innerHTML = `<strong>${p.codigo_ean}</strong> - ${p.nombre} ${p.color || ''} <span class="badge bg-secondary float-end">Stock: ${p.stock_actual}</span>`;
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                input.value = `${p.codigo_ean} - ${p.nombre} ${p.color || ''}`;
+                hiddenId.value = p.id;
+                precioInput.value = p.precio_compra.toFixed(2);
+                dropdown.classList.remove('show');
+            });
+            dropdown.appendChild(item);
+        });
+        
+        dropdown.classList.add('show');
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Salidas - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Salidas</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box-arrow-up text-danger me-2"></i>Salidas de Inventario</h2>
+    <a href="{{ url_for('movimientos.nueva_salida') }}" class="btn btn-danger">
+        <i class="bi bi-plus-circle me-1"></i> Nueva Salida
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Desde</label>
+                <input type="date" class="form-control" name="fecha_desde" 
+                       value="{{ request.args.get('fecha_desde', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Hasta</label>
+                <input type="date" class="form-control" name="fecha_hasta"
+                       value="{{ request.args.get('fecha_hasta', '') }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Buscar</label>
+                <input type="text" class="form-control" name="buscar" 
+                       value="{{ request.args.get('buscar', '') }}" placeholder="Producto, destino...">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nº Reg.</th>
+                    <th>Fecha</th>
+                    <th>Producto</th>
+                    <th class="text-center">Cantidad</th>
+                    <th>Destino</th>
+                    <th>Usuario</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for salida in salidas.items %}
+                <tr>
+                    <td><code>{{ salida.numero_registro }}</code></td>
+                    <td>{{ salida.fecha.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('productos.ver', id=salida.producto.id) }}">
+                            {{ salida.producto.nombre }}
+                        </a>
+                        <br><small class="text-muted">{{ salida.producto.color or '' }}</small>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-danger">-{{ salida.cantidad }}</span>
+                    </td>
+                    <td>{{ salida.destino or '-' }}</td>
+                    <td><small>{{ salida.usuario.nombre_completo if salida.usuario else '-' }}</small></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">
+                        No se encontraron salidas
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if salidas.pages > 1 %}
+    <div class="card-footer">
+        <nav>
+            <ul class="pagination mb-0 justify-content-center">
+                {% if salidas.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('movimientos.listar_salidas', page=salidas.prev_num) }}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for page in salidas.iter_pages() %}
+                    {% if page %}
+                    <li class="page-item {% if page == salidas.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('movimientos.listar_salidas', page=page) }}">{{ page }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if salidas.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('movimientos.listar_salidas', page=salidas.next_num) }}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

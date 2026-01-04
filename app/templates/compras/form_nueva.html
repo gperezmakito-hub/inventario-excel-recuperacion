@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Solicitud de Compra - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Solicitudes</a></li>
+    <li class="breadcrumb-item active">Nueva</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-cart-plus me-2"></i>
+                    Nueva Solicitud de Compra
+                </h5>
+            </div>
+            
+            <form method="POST" id="formSolicitud">
+                <div class="card-body">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Prioridad</label>
+                            <select class="form-select" name="prioridad">
+                                <option value="normal">Normal</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Proveedor (sugerido)</label>
+                            <select class="form-select" name="proveedor_id">
+                                <option value="">-- Seleccionar --</option>
+                                {% for prov in proveedores %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Motivo</label>
+                            <input type="text" class="form-control" name="motivo" 
+                                   placeholder="Ej: Reposición stock bajo">
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6 class="mb-3">Productos a solicitar</h6>
+                    
+                    <!-- Productos con stock bajo (sugerencias) -->
+                    {% if productos_stock_bajo %}
+                    <div class="alert alert-warning">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Productos con stock bajo
+                        </h6>
+                        <div class="row row-cols-1 row-cols-md-3 g-2 mt-2">
+                            {% for p in productos_stock_bajo[:6] %}
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input producto-check" type="checkbox" 
+                                           value="{{ p.id }}" id="check_{{ p.id }}"
+                                           data-nombre="{{ p.nombre }}"
+                                           data-color="{{ p.color or '' }}"
+                                           data-precio="{{ p.precio_compra or 0 }}"
+                                           data-sugerido="{{ (p.stock_minimo * 2) - p.stock_actual }}">
+                                    <label class="form-check-label" for="check_{{ p.id }}">
+                                        <small>{{ p.nombre }}</small>
+                                        <br>
+                                        <small class="text-muted">
+                                            Stock: {{ p.stock_actual }}/{{ p.stock_minimo }}
+                                        </small>
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-warning mt-2" id="btnAgregarSeleccionados">
+                            <i class="bi bi-plus me-1"></i> Agregar seleccionados
+                        </button>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Tabla de productos -->
+                    <table class="table" id="tablaProductos">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 50%">Producto</th>
+                                <th style="width: 20%">Cantidad</th>
+                                <th style="width: 20%">Precio Est.</th>
+                                <th style="width: 10%"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="productosBody">
+                            <!-- Las filas se agregan dinámicamente -->
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnAgregarProducto">
+                                        <i class="bi bi-plus-circle me-1"></i> Agregar producto
+                                    </button>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('compras.listar') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i> Crear Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let filaIndex = 0;
+
+function agregarFilaProducto(productoId = '', productoNombre = '', cantidad = 1, precio = 0) {
+    const tbody = document.getElementById('productosBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>
+            <input type="hidden" name="producto_id[]" value="${productoId}" class="producto-id">
+            <input type="text" class="form-control producto-buscar" placeholder="Buscar producto..." 
+                   value="${productoNombre}" autocomplete="off">
+            <div class="dropdown-menu producto-dropdown" style="max-height: 200px; overflow-y: auto;"></div>
+        </td>
+        <td>
+            <input type="number" class="form-control" name="cantidad[]" min="1" value="${cantidad}" required>
+        </td>
+        <td>
+            <input type="text" class="form-control precio-estimado" value="${precio}" readonly>
+        </td>
+        <td>
+            <button type="button" class="btn btn-outline-danger btn-sm btn-eliminar">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(tr);
+    
+    // Configurar búsqueda de productos
+    const input = tr.querySelector('.producto-buscar');
+    const dropdown = tr.querySelector('.producto-dropdown');
+    const hiddenId = tr.querySelector('.producto-id');
+    const precioInput = tr.querySelector('.precio-estimado');
+    
+    input.addEventListener('input', async function() {
+        const q = this.value.trim();
+        if (q.length < 2) {
+            dropdown.classList.remove('show');
+            return;
+        }
+        
+        const response = await fetch(`/productos/api/buscar?q=${encodeURIComponent(q)}`);
+        const productos = await response.json();
+        
+        dropdown.innerHTML = '';
+        productos.forEach(p => {
+            const item = document.createElement('a');
+            item.className = 'dropdown-item';
+            item.href = '#';
+            item.textContent = `${p.codigo_ean} - ${p.nombre} ${p.color || ''} (Stock: ${p.stock_actual})`;
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                input.value = `${p.nombre} ${p.color || ''}`;
+                hiddenId.value = p.id;
+                precioInput.value = p.precio_compra.toFixed(2) + '€';
+                dropdown.classList.remove('show');
+            });
+            dropdown.appendChild(item);
+        });
+        
+        dropdown.classList.add('show');
+        dropdown.style.position = 'absolute';
+        dropdown.style.top = '100%';
+        dropdown.style.left = '0';
+        dropdown.style.right = '0';
+    });
+    
+    // Cerrar dropdown al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+    
+    // Botón eliminar
+    tr.querySelector('.btn-eliminar').addEventListener('click', function() {
+        tr.remove();
+    });
+    
+    filaIndex++;
+}
+
+// Botón agregar producto vacío
+document.getElementById('btnAgregarProducto').addEventListener('click', function() {
+    agregarFilaProducto();
+});
+
+// Botón agregar productos seleccionados de stock bajo
+document.getElementById('btnAgregarSeleccionados')?.addEventListener('click', function() {
+    document.querySelectorAll('.producto-check:checked').forEach(check => {
+        const id = check.value;
+        const nombre = check.dataset.nombre + ' ' + check.dataset.color;
+        const cantidad = parseInt(check.dataset.sugerido) || 1;
+        const precio = parseFloat(check.dataset.precio) || 0;
+        
+        agregarFilaProducto(id, nombre.trim(), cantidad, precio.toFixed(2) + '€');
+        check.checked = false;
+    });
+});
+
+// Agregar una fila inicial
+agregarFilaProducto();
+</script>
+{% endblock %}

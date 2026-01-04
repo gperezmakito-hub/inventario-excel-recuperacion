@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{% if proveedor %}Editar{% else %}Nuevo{% endif %} Proveedor - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('proveedores.listar') }}">Proveedores</a></li>
+    <li class="breadcrumb-item active">{% if proveedor %}Editar{% else %}Nuevo{% endif %}</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-building me-2"></i>
+                    {% if proveedor %}Editar Proveedor{% else %}Nuevo Proveedor{% endif %}
+                </h5>
+            </div>
+            
+            <form method="POST">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" class="form-control" name="nombre" 
+                                   value="{{ proveedor.nombre if proveedor else '' }}" required>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <label class="form-label">NIF/CIF</label>
+                            <input type="text" class="form-control" name="nif" 
+                                   value="{{ proveedor.nif if proveedor else '' }}">
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Dirección</label>
+                            <textarea class="form-control" name="direccion" rows="2">{{ proveedor.direccion if proveedor else '' }}</textarea>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Teléfono</label>
+                            <input type="tel" class="form-control" name="telefono" 
+                                   value="{{ proveedor.telefono if proveedor else '' }}">
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" 
+                                   value="{{ proveedor.email if proveedor else '' }}">
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Persona de Contacto</label>
+                            <input type="text" class="form-control" name="persona_contacto" 
+                                   value="{{ proveedor.persona_contacto if proveedor else '' }}">
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Notas</label>
+                            <textarea class="form-control" name="notas" rows="3">{{ proveedor.notas if proveedor else '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('proveedores.listar') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i> 
+                        {% if proveedor %}Guardar Cambios{% else %}Crear Proveedor{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

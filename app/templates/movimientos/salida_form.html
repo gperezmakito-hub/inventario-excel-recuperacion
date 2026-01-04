@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Salida - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('movimientos.listar_salidas') }}">Salidas</a></li>
+    <li class="breadcrumb-item active">Nueva</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-danger bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-box-arrow-up text-danger me-2"></i>
+                    Registrar Salida de Inventario
+                </h5>
+            </div>
+            
+            <form method="POST">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- Producto -->
+                        <div class="col-12">
+                            <label class="form-label">Producto *</label>
+                            {% if producto_preseleccionado %}
+                            <input type="hidden" name="producto_id" value="{{ producto_preseleccionado.id }}">
+                            <input type="text" class="form-control" 
+                                   value="{{ producto_preseleccionado.nombre }} - {{ producto_preseleccionado.color or '' }}" 
+                                   readonly>
+                            <small class="text-muted">
+                                Stock actual: <strong>{{ producto_preseleccionado.stock_actual }}</strong>
+                            </small>
+                            {% else %}
+                            <input type="hidden" name="producto_id" id="producto_id">
+                            <input type="text" class="form-control" id="producto_buscar" 
+                                   placeholder="Buscar por código o nombre..." autocomplete="off">
+                            <div class="dropdown-menu w-100" id="producto_dropdown"></div>
+                            <small class="text-muted" id="stock_info"></small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Cantidad *</label>
+                            <input type="number" class="form-control" name="cantidad" min="1" value="1" required>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">Destino / Uso</label>
+                            <input type="text" class="form-control" name="destino" 
+                                   placeholder="Ej: Producción, Pedido cliente...">
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Notas</label>
+                            <textarea class="form-control" name="notas" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('movimientos.listar_salidas') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-check-lg me-1"></i> Registrar Salida
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const input = document.getElementById('producto_buscar');
+const dropdown = document.getElementById('producto_dropdown');
+const hiddenId = document.getElementById('producto_id');
+const stockInfo = document.getElementById('stock_info');
+
+if (input) {
+    input.addEventListener('input', async function() {
+        const q = this.value.trim();
+        if (q.length < 2) {
+            dropdown.classList.remove('show');
+            return;
+        }
+        
+        const response = await fetch(`/productos/api/buscar?q=${encodeURIComponent(q)}`);
+        const productos = await response.json();
+        
+        dropdown.innerHTML = '';
+        productos.forEach(p => {
+            const item = document.createElement('a');
+            item.className = 'dropdown-item';
+            item.href = '#';
+            item.innerHTML = `<strong>${p.codigo_ean}</strong> - ${p.nombre} ${p.color || ''} <span class="badge bg-${p.stock_actual > 0 ? 'success' : 'danger'} float-end">Stock: ${p.stock_actual}</span>`;
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                input.value = `${p.codigo_ean} - ${p.nombre} ${p.color || ''}`;
+                hiddenId.value = p.id;
+                stockInfo.innerHTML = `Stock disponible: <strong>${p.stock_actual}</strong>`;
+                dropdown.classList.remove('show');
+            });
+            dropdown.appendChild(item);
+        });
+        
+        dropdown.classList.add('show');
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!input.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+}
+</script>
+{% endblock %}

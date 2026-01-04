@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitudes En Curso - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Compras</a></li>
+    <li class="breadcrumb-item active">En Curso</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-truck text-info me-2"></i>Solicitudes En Curso</h2>
+</div>
+
+{% if solicitudes %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-light">
+            <tr>
+                <th>Nº Solicitud</th>
+                <th>Estado</th>
+                <th>Proveedor</th>
+                <th>Fecha Pedido</th>
+                <th>Entrega Estimada</th>
+                <th>Productos</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for solicitud in solicitudes %}
+            <tr>
+                <td>
+                    <strong>{{ solicitud.numero }}</strong>
+                    {% if solicitud.numero_pedido_proveedor %}
+                    <br><small class="text-muted">Ped: {{ solicitud.numero_pedido_proveedor }}</small>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if solicitud.estado == 'aprobada' %}
+                    <span class="badge bg-success">Aprobada</span>
+                    {% elif solicitud.estado == 'pedida' %}
+                    <span class="badge bg-primary">Pedida</span>
+                    {% elif solicitud.estado == 'en_transito' %}
+                    <span class="badge bg-info">En Tránsito</span>
+                    {% endif %}
+                </td>
+                <td>{{ solicitud.proveedor.nombre if solicitud.proveedor else '-' }}</td>
+                <td>{{ solicitud.fecha_pedido.strftime('%d/%m/%Y') if solicitud.fecha_pedido else '-' }}</td>
+                <td>
+                    {% if solicitud.fecha_entrega_estimada %}
+                    {{ solicitud.fecha_entrega_estimada.strftime('%d/%m/%Y') }}
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="badge bg-secondary">{{ solicitud.lineas.count() }}</span>
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('compras.ver', id=solicitud.id) }}" class="btn btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        {% if solicitud.estado == 'aprobada' %}
+                        <a href="{{ url_for('compras.pedir', id=solicitud.id) }}" class="btn btn-outline-success" title="Registrar pedido">
+                            <i class="bi bi-truck"></i>
+                        </a>
+                        {% elif solicitud.estado == 'pedida' %}
+                        <form method="POST" action="{{ url_for('compras.marcar_enviado', id=solicitud.id) }}" class="d-inline">
+                            <button type="submit" class="btn btn-outline-info" title="Marcar en tránsito">
+                                <i class="bi bi-box-seam"></i>
+                            </button>
+                        </form>
+                        {% elif solicitud.estado == 'en_transito' %}
+                        <a href="{{ url_for('compras.recibir', id=solicitud.id) }}" class="btn btn-outline-success" title="Registrar recepción">
+                            <i class="bi bi-check2-square"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    No hay solicitudes en curso actualmente.
+</div>
+{% endif %}
+{% endblock %}

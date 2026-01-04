@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitud Rápida - {{ producto.nombre }}{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('productos.stock_bajo') }}">Stock Bajo</a></li>
+    <li class="breadcrumb-item active">Solicitud Rápida</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-warning bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-cart-plus me-2"></i>
+                    Solicitud Rápida de Compra
+                </h5>
+            </div>
+            
+            <form method="POST">
+                <div class="card-body">
+                    <!-- Info del producto -->
+                    <div class="alert alert-light border">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-1">{{ producto.nombre }}</h5>
+                                <p class="text-muted mb-0">
+                                    {{ producto.color or '' }} | 
+                                    Código: {{ producto.codigo_ean }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <span class="badge bg-{% if producto.stock_actual == 0 %}danger{% else %}warning{% endif %} fs-5">
+                                    Stock: {{ producto.stock_actual }}
+                                </span>
+                                <br>
+                                <small class="text-muted">Mínimo: {{ producto.stock_minimo }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Cantidad a solicitar *</label>
+                            <input type="number" class="form-control form-control-lg" name="cantidad" 
+                                   value="{{ cantidad_sugerida }}" min="1" required autofocus>
+                            <small class="text-muted">
+                                Sugerido: {{ cantidad_sugerida }} (para llegar a 2x mínimo)
+                            </small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Prioridad</label>
+                            <select class="form-select form-select-lg" name="prioridad">
+                                <option value="normal">Normal</option>
+                                <option value="alta" {% if producto.stock_actual == 0 %}selected{% endif %}>Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Proveedor</label>
+                            <input type="text" class="form-control" 
+                                   value="{{ producto.proveedor.nombre if producto.proveedor else 'Sin proveedor asignado' }}" 
+                                   readonly>
+                        </div>
+                        
+                        <div class="col-12">
+                            <label class="form-label">Precio estimado unitario</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" 
+                                       value="{{ '%.2f'|format(producto.precio_compra or 0) }}" readonly>
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('productos.stock_bajo') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-send me-1"></i> Crear Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

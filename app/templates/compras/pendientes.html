@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitudes Pendientes - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Compras</a></li>
+    <li class="breadcrumb-item active">Pendientes</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-clock-history text-warning me-2"></i>Solicitudes Pendientes de Aprobación</h2>
+    <a href="{{ url_for('compras.nueva') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> Nueva Solicitud
+    </a>
+</div>
+
+{% if solicitudes %}
+<div class="row g-4">
+    {% for solicitud in solicitudes %}
+    <div class="col-lg-6">
+        <div class="card h-100 border-warning">
+            <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ solicitud.numero }}</strong>
+                    {% if solicitud.prioridad == 'urgente' %}
+                    <span class="badge bg-danger ms-2">URGENTE</span>
+                    {% elif solicitud.prioridad == 'alta' %}
+                    <span class="badge bg-warning text-dark ms-2">ALTA</span>
+                    {% endif %}
+                </div>
+                <small class="text-muted">
+                    {{ solicitud.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
+                </small>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <i class="bi bi-person me-1"></i>
+                    <strong>Solicitado por:</strong> {{ solicitud.creador.nombre_completo if solicitud.creador else 'N/A' }}
+                </p>
+                
+                {% if solicitud.proveedor %}
+                <p class="mb-2">
+                    <i class="bi bi-building me-1"></i>
+                    <strong>Proveedor:</strong> {{ solicitud.proveedor.nombre }}
+                </p>
+                {% endif %}
+                
+                {% if solicitud.motivo %}
+                <p class="mb-2">
+                    <i class="bi bi-chat-text me-1"></i>
+                    {{ solicitud.motivo }}
+                </p>
+                {% endif %}
+                
+                <hr>
+                
+                <h6>Productos solicitados:</h6>
+                <ul class="list-unstyled mb-0">
+                    {% for linea in solicitud.lineas %}
+                    <li class="mb-1">
+                        <span class="badge bg-secondary">{{ linea.cantidad_solicitada }}</span>
+                        {{ linea.producto.nombre }} 
+                        <small class="text-muted">{{ linea.producto.color or '' }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <a href="{{ url_for('compras.ver', id=solicitud.id) }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-eye me-1"></i> Ver Detalle
+                </a>
+                {% if current_user.puede_aprobar() %}
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('compras.aprobar', id=solicitud.id) }}" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i> Aprobar
+                    </a>
+                    <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rechazarModal{{ solicitud.id }}">
+                        <i class="bi bi-x-lg me-1"></i> Rechazar
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Rechazar -->
+    <div class="modal fade" id="rechazarModal{{ solicitud.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ url_for('compras.rechazar', id=solicitud.id) }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Rechazar Solicitud {{ solicitud.numero }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Motivo del rechazo *</label>
+                            <textarea class="form-control" name="motivo" rows="3" required></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Rechazar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-2"></i>
+    No hay solicitudes pendientes de aprobación.
+</div>
+{% endif %}
+{% endblock %}

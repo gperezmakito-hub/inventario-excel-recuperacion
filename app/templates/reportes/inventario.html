@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Reporte Inventario - Inventario Tintas{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('reportes.index') }}">Reportes</a></li>
+    <li class="breadcrumb-item active">Inventario</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-box-seam me-2"></i>Inventario Actual</h2>
+    <a href="{{ url_for('reportes.exportar_inventario') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-download me-1"></i> Exportar CSV
+    </a>
+</div>
+
+<!-- Resumen -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.total_productos }}</h4>
+                <p class="mb-0">Productos</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.total_unidades }}</h4>
+                <p class="mb-0">Unidades</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning">
+            <div class="card-body text-center">
+                <h4>{{ "%.2f"|format(stats.valor_total) }}€</h4>
+                <p class="mb-0">Valor Total</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h4>{{ stats.stock_bajo }}</h4>
+                <p class="mb-0">Stock Bajo</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Categoría</label>
+                <select class="form-select" name="categoria">
+                    <option value="">Todas</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat.id }}" 
+                            {% if request.args.get('categoria')|int == cat.id %}selected{% endif %}>
+                        {{ cat.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Proveedor</label>
+                <select class="form-select" name="proveedor">
+                    <option value="">Todos</option>
+                    {% for prov in proveedores %}
+                    <option value="{{ prov.id }}" 
+                            {% if request.args.get('proveedor')|int == prov.id %}selected{% endif %}>
+                        {{ prov.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Estado Stock</label>
+                <select class="form-select" name="stock">
+                    <option value="">Todos</option>
+                    <option value="bajo" {% if request.args.get('stock') == 'bajo' %}selected{% endif %}>
+                        Stock Bajo
+                    </option>
+                    <option value="sin" {% if request.args.get('stock') == 'sin' %}selected{% endif %}>
+                        Sin Stock
+                    </option>
+                    <option value="ok" {% if request.args.get('stock') == 'ok' %}selected{% endif %}>
+                        Stock OK
+                    </option>
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-secondary w-100">
+                    <i class="bi bi-search me-1"></i> Filtrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th class="text-center">Stock</th>
+                    <th class="text-center">Mínimo</th>
+                    <th class="text-end">Precio</th>
+                    <th class="text-end">Valor Stock</th>
+                    <th>Proveedor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for producto in productos %}
+                <tr class="{% if producto.stock_actual <= 0 %}table-danger{% elif producto.stock_actual < producto.stock_minimo %}table-warning{% endif %}">
+                    <td><code>{{ producto.codigo_ean }}</code></td>
+                    <td>
+                        <a href="{{ url_for('productos.ver', id=producto.id) }}">
+                            {{ producto.nombre }}
+                        </a>
+                        <br><small class="text-muted">{{ producto.color or '' }}</small>
+                    </td>
+                    <td>{{ producto.categoria.nombre if producto.categoria else '-' }}</td>
+                    <td class="text-center">
+                        <strong>{{ producto.stock_actual }}</strong>
+                    </td>
+                    <td class="text-center text-muted">{{ producto.stock_minimo }}</td>
+                    <td class="text-end">{{ "%.2f"|format(producto.precio_compra or 0) }}€</td>
+                    <td class="text-end">{{ "%.2f"|format((producto.precio_compra or 0) * producto.stock_actual) }}€</td>
+                    <td><small>{{ producto.proveedor.nombre if producto.proveedor else '-' }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+                <tr>
+                    <th colspan="6" class="text-end">Total Valoración:</th>
+                    <th class="text-end">{{ "%.2f"|format(stats.valor_total) }}€</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}

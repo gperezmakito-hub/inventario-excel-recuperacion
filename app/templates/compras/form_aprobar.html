@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Aprobar Solicitud {{ solicitud.numero }}{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('main.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.listar') }}">Solicitudes</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('compras.ver', id=solicitud.id) }}">{{ solicitud.numero }}</a></li>
+    <li class="breadcrumb-item active">Aprobar</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header bg-success bg-opacity-10">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle me-2"></i>
+                    Aprobar Solicitud {{ solicitud.numero }}
+                </h5>
+            </div>
+            
+            <form method="POST">
+                <div class="card-body">
+                    <!-- Info solicitud -->
+                    <div class="alert alert-info">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Solicitado por:</strong><br>
+                                {{ solicitud.creador.nombre_completo if solicitud.creador else '-' }}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Fecha:</strong><br>
+                                {{ solicitud.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Prioridad:</strong><br>
+                                {% if solicitud.prioridad == 'urgente' %}
+                                <span class="badge bg-danger">URGENTE</span>
+                                {% elif solicitud.prioridad == 'alta' %}
+                                <span class="badge bg-warning text-dark">ALTA</span>
+                                {% else %}
+                                Normal
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if solicitud.motivo %}
+                        <hr>
+                        <strong>Motivo:</strong> {{ solicitud.motivo }}
+                        {% endif %}
+                    </div>
+                    
+                    <h6 class="mb-3">Revisar cantidades</h6>
+                    <p class="text-muted small">Puedes ajustar las cantidades aprobadas si es necesario.</p>
+                    
+                    <table class="table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Producto</th>
+                                <th class="text-center">Stock Actual</th>
+                                <th class="text-center">Solicitado</th>
+                                <th class="text-center">Aprobar</th>
+                                <th class="text-end">Precio Est.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for linea in lineas %}
+                            <tr>
+                                <td>
+                                    {{ linea.producto.nombre }}
+                                    <br><small class="text-muted">{{ linea.producto.color or '' }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-{% if linea.producto.stock_bajo %}warning{% else %}success{% endif %}">
+                                        {{ linea.producto.stock_actual }}
+                                    </span>
+                                </td>
+                                <td class="text-center">{{ linea.cantidad_solicitada }}</td>
+                                <td class="text-center" style="width: 120px;">
+                                    <input type="number" class="form-control form-control-sm text-center" 
+                                           name="cantidad_{{ linea.id }}" 
+                                           value="{{ linea.cantidad_solicitada }}" min="0">
+                                </td>
+                                <td class="text-end">{{ "%.2f"|format(linea.precio_estimado or 0) }}€</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="4" class="text-end">TOTAL ESTIMADO:</th>
+                                <th class="text-end">{{ "%.2f"|format(solicitud.total_estimado) }}€</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    
+                    <hr>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Proveedor</label>
+                            <select class="form-select" name="proveedor_id">
+                                <option value="">-- Seleccionar --</option>
+                                {% for prov in proveedores %}
+                                <option value="{{ prov.id }}" 
+                                        {% if solicitud.proveedor_id == prov.id %}selected{% endif %}>
+                                    {{ prov.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Notas de aprobación</label>
+                            <input type="text" class="form-control" name="notas" 
+                                   placeholder="Opcional">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer d-flex justify-content-between">
+                    <a href="{{ url_for('compras.ver', id=solicitud.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Volver
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i> Aprobar Solicitud
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
