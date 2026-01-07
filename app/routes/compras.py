@@ -1,6 +1,7 @@
 """
 Rutas de gestión de compras con workflow de aprobación
 """
+import json
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from app.models import (
@@ -212,6 +213,77 @@ def solicitud_rapida(producto_id):
                            cantidad_sugerida=cantidad_sugerida)
 
 
+@compras_bp.route('/nueva-desde-stock', methods=['POST'])
+@login_required
+def nueva_desde_stock():
+    """Crear solicitud de compra desde selección múltiple en stock bajo"""
+    try:
+        productos_json = request.form.get('productos_json', '[]')
+        productos_data = json.loads(productos_json)
+        
+        if not productos_data:
+            flash('No se han seleccionado productos.', 'warning')
+            return redirect(url_for('productos.stock_bajo'))
+        
+        # Obtener primer producto para determinar proveedor
+        primer_producto = Producto.query.get(productos_data[0]['producto_id'])
+        if not primer_producto:
+            flash('Error: Producto no encontrado.', 'danger')
+            return redirect(url_for('productos.stock_bajo'))
+        
+        # Crear solicitud
+        solicitud = SolicitudCompra(
+            numero=SolicitudCompra.generar_numero(),
+            estado='pendiente',
+            prioridad='normal',
+            proveedor_id=primer_producto.proveedor_id,
+            creado_por_id=current_user.id,
+            motivo=request.form.get('observaciones', '').strip() or 'Reposición stock bajo'
+        )
+        
+        db.session.add(solicitud)
+        db.session.flush()
+        
+        # Agregar líneas de productos
+        productos_agregados = 0
+        for item in productos_data:
+            producto = Producto.query.get(item['producto_id'])
+            if producto:
+                # Verificar que todos sean del mismo proveedor
+                if producto.proveedor_id != primer_producto.proveedor_id:
+                    db.session.rollback()
+                    flash('Error: Todos los productos deben ser del mismo proveedor.', 'danger')
+                    return redirect(url_for('productos.stock_bajo'))
+                
+                linea = LineaSolicitud(
+                    solicitud_id=solicitud.id,
+                    producto_id=producto.id,
+                    cantidad_solicitada=item['cantidad'],
+                    precio_estimado=producto.precio_compra
+                )
+                db.session.add(linea)
+                productos_agregados += 1
+        
+        if productos_agregados == 0:
+            db.session.rollback()
+            flash('No se pudo agregar ningún producto a la solicitud.', 'warning')
+            return redirect(url_for('productos.stock_bajo'))
+        
+        # Registrar en historial
+        registrar_historial(solicitud, None, 'pendiente', 
+                           f'Solicitud creada desde stock bajo con {productos_agregados} productos')
+        
+        db.session.commit()
+        
+        flash(f'Solicitud {solicitud.numero} creada con {productos_agregados} productos.', 'success')
+        return redirect(url_for('compras.ver', id=solicitud.id))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al crear la solicitud: {str(e)}', 'danger')
+        return redirect(url_for('productos.stock_bajo'))
+
+
 # =============================================================================
 # VER SOLICITUD
 # =============================================================================
@@ -344,7 +416,9 @@ def pedir(id):
         flash(f'Pedido registrado para solicitud {solicitud.numero}.', 'success')
         return redirect(url_for('compras.ver', id=id))
     
-    return render_template('compras/form_pedir.html', solicitud=solicitud)
+    return render_template('compras/form_pedir.html', 
+                         solicitud=solicitud,
+                         now=datetime.now())
 
 
 # =============================================================================

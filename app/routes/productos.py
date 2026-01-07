@@ -197,12 +197,41 @@ def editar(id):
 @login_required
 def stock_bajo():
     """Listado de productos con stock bajo"""
-    productos = Producto.query.filter(
+    proveedor_id = request.args.get('proveedor_id', type=int)
+    
+    query = Producto.query.filter(
         Producto.stock_actual <= Producto.stock_minimo,
         Producto.activo == True
-    ).order_by(Producto.stock_actual).all()
+    )
     
-    return render_template('productos/stock_bajo.html', productos=productos)
+    # Filtrar por proveedor si se especifica
+    if proveedor_id:
+        query = query.filter_by(proveedor_id=proveedor_id)
+    
+    productos = query.order_by(Producto.stock_actual).all()
+    
+    # Obtener proveedores con productos en stock bajo y contar
+    proveedores_query = db.session.query(
+        Proveedor,
+        db.func.count(Producto.id).label('productos_stock_bajo')
+    ).join(
+        Producto, Producto.proveedor_id == Proveedor.id
+    ).filter(
+        Producto.stock_actual <= Producto.stock_minimo,
+        Producto.activo == True,
+        Proveedor.activo == True
+    ).group_by(Proveedor.id).order_by(Proveedor.nombre).all()
+    
+    # Crear lista de proveedores con el conteo
+    proveedores = []
+    for prov, count in proveedores_query:
+        prov.productos_stock_bajo = count
+        proveedores.append(prov)
+    
+    return render_template('productos/stock_bajo.html', 
+                         productos=productos,
+                         proveedores=proveedores,
+                         proveedor_id=proveedor_id)
 
 
 @productos_bp.route('/api/buscar')

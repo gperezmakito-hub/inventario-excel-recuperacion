@@ -15,18 +15,47 @@
         <i class="bi bi-exclamation-triangle text-warning me-2"></i>
         Productos con Stock Bajo
     </h2>
-    <a href="{{ url_for('compras.nueva') }}" class="btn btn-primary">
-        <i class="bi bi-cart-plus me-1"></i> Nueva Solicitud de Compra
-    </a>
+</div>
+
+<!-- Filtros y acciones -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" id="filtroForm" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label">Filtrar por Proveedor</label>
+                <select name="proveedor_id" id="proveedorSelect" class="form-select">
+                    <option value="">-- Todos los proveedores --</option>
+                    {% for prov in proveedores %}
+                    <option value="{{ prov.id }}" {% if proveedor_id == prov.id %}selected{% endif %}>
+                        {{ prov.nombre }} ({{ prov.productos_stock_bajo }} productos)
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-funnel me-1"></i> Filtrar
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" id="btnSolicitudMultiple" class="btn btn-success w-100" disabled>
+                    <i class="bi bi-cart-plus me-1"></i> Solicitar Seleccionados (<span id="contadorSeleccionados">0</span>)
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% if productos %}
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" id="tablaProductos">
                 <thead class="table-light">
                     <tr>
+                        <th width="40">
+                            <input type="checkbox" id="selectAll" class="form-check-input">
+                        </th>
                         <th>Producto</th>
                         <th>Color</th>
                         <th class="text-center">Stock Actual</th>
@@ -34,12 +63,18 @@
                         <th class="text-center">Faltan</th>
                         <th>Proveedor</th>
                         <th class="text-end">Precio Unit.</th>
+                        <th class="text-center">Cantidad a Pedir</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for producto in productos %}
-                    <tr class="{% if producto.stock_actual == 0 %}stock-critico{% else %}stock-bajo{% endif %}">
+                    <tr class="{% if producto.stock_actual == 0 %}stock-critico{% else %}stock-bajo{% endif %}" 
+                        data-proveedor="{{ producto.proveedor_id or '' }}">
+                        <td>
+                            <input type="checkbox" class="form-check-input producto-checkbox" 
+                                   value="{{ producto.id }}" data-producto-id="{{ producto.id }}">
+                        </td>
                         <td>
                             <a href="{{ url_for('productos.ver', id=producto.id) }}" class="text-decoration-none">
                                 <strong>{{ producto.nombre }}</strong>
@@ -63,6 +98,22 @@
                         </td>
                         <td>{{ producto.proveedor.nombre if producto.proveedor else '-' }}</td>
                         <td class="text-end">{{ "%.2f"|format(producto.precio_compra or 0) }}€</td>
+                        <td class="text-center">
+                            <div class="input-group input-group-sm" style="width: 140px; margin: 0 auto;">
+                                <button class="btn btn-outline-secondary btn-cantidad-menos" type="button" 
+                                        data-producto-id="{{ producto.id }}" disabled>
+                                    <i class="bi bi-dash"></i>
+                                </button>
+                                <input type="number" class="form-control text-center cantidad-input" 
+                                       id="cantidad_{{ producto.id }}" min="1" 
+                                       value="{{ producto.stock_minimo - producto.stock_actual }}"
+                                       disabled readonly>
+                                <button class="btn btn-outline-secondary btn-cantidad-mas" type="button" 
+                                        data-producto-id="{{ producto.id }}" disabled>
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        </td>
                         <td class="text-end">
                             <a href="{{ url_for('compras.solicitud_rapida', producto_id=producto.id) }}" 
                                class="btn btn-sm btn-warning">
@@ -90,4 +141,218 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Modal para Solicitud Múltiple -->
+<div class="modal fade" id="modalSolicitudMultiple" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-cart-plus me-2"></i>Nueva Solicitud de Compra
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('compras.nueva_desde_stock') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Proveedor</label>
+                        <input type="text" class="form-control" id="proveedorNombre" readonly>
+                    </div>
+                    
+                    <h6>Productos seleccionados:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-center">Faltan</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th class="text-end">Precio Unit.</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productosSeleccionadosBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <textarea name="observaciones" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <input type="hidden" name="productos_json" id="productosJson">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Solicitud</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.stock-critico {
+    background-color: #fff5f5 !important;
+}
+.stock-bajo {
+    background-color: #fffbf0 !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.producto-checkbox');
+    const btnSolicitud = document.getElementById('btnSolicitudMultiple');
+    const contador = document.getElementById('contadorSeleccionados');
+    const cantidadInputs = document.querySelectorAll('.cantidad-input');
+    
+    // Actualizar contador y habilitar/deshabilitar controles
+    function actualizarSeleccion() {
+        const seleccionados = Array.from(checkboxes).filter(cb => cb.checked);
+        const count = seleccionados.length;
+        
+        contador.textContent = count;
+        btnSolicitud.disabled = count === 0;
+        
+        // Habilitar/deshabilitar inputs y botones de cantidad
+        checkboxes.forEach(cb => {
+            const productoId = cb.value;
+            const cantidad = document.getElementById('cantidad_' + productoId);
+            const btnMenos = document.querySelector(`.btn-cantidad-menos[data-producto-id="${productoId}"]`);
+            const btnMas = document.querySelector(`.btn-cantidad-mas[data-producto-id="${productoId}"]`);
+            
+            if (cantidad && btnMenos && btnMas) {
+                cantidad.disabled = !cb.checked;
+                btnMenos.disabled = !cb.checked;
+                btnMas.disabled = !cb.checked;
+            }
+        });
+    }
+    
+    // Botones +/- para cantidad
+    document.querySelectorAll('.btn-cantidad-menos').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productoId = this.dataset.productoId;
+            const input = document.getElementById('cantidad_' + productoId);
+            const valorActual = parseInt(input.value) || 1;
+            if (valorActual > 1) {
+                input.value = valorActual - 1;
+            }
+        });
+    });
+    
+    document.querySelectorAll('.btn-cantidad-mas').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const productoId = this.dataset.productoId;
+            const input = document.getElementById('cantidad_' + productoId);
+            const valorActual = parseInt(input.value) || 1;
+            input.value = valorActual + 1;
+        });
+    });
+    
+    // Seleccionar/deseleccionar todos
+    selectAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => {
+            cb.checked = selectAll.checked;
+        });
+        actualizarSeleccion();
+    });
+    
+    // Checkbox individual
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            actualizarSeleccion();
+            
+            // Si alguno se desmarca, desmarcar "select all"
+            if (!cb.checked) {
+                selectAll.checked = false;
+            }
+            // Si todos están marcados, marcar "select all"
+            if (Array.from(checkboxes).every(c => c.checked)) {
+                selectAll.checked = true;
+            }
+        });
+    });
+    
+    // Abrir modal con productos seleccionados
+    btnSolicitud.addEventListener('click', function() {
+        const seleccionados = Array.from(checkboxes).filter(cb => cb.checked);
+        
+        if (seleccionados.length === 0) {
+            alert('Selecciona al menos un producto');
+            return;
+        }
+        
+        // Verificar que todos sean del mismo proveedor
+        const proveedores = new Set();
+        seleccionados.forEach(cb => {
+            const row = cb.closest('tr');
+            const prov = row.dataset.proveedor;
+            if (prov) proveedores.add(prov);
+        });
+        
+        if (proveedores.size > 1) {
+            alert('Todos los productos deben ser del mismo proveedor');
+            return;
+        }
+        
+        // Construir lista de productos
+        const productosData = [];
+        const tbody = document.getElementById('productosSeleccionadosBody');
+        tbody.innerHTML = '';
+        
+        seleccionados.forEach(cb => {
+            const row = cb.closest('tr');
+            const productoId = cb.value;
+            const nombre = row.querySelector('strong').textContent;
+            const cantidadInput = document.getElementById('cantidad_' + productoId);
+            const cantidad = parseInt(cantidadInput.value) || 1;
+            const precioText = row.querySelectorAll('td')[7].textContent;
+            const precio = parseFloat(precioText.replace('€', '').trim());
+            const faltan = row.querySelectorAll('td')[5].textContent.trim();
+            const proveedor = row.querySelectorAll('td')[6].textContent.trim();
+            
+            productosData.push({
+                producto_id: productoId,
+                cantidad: cantidad
+            });
+            
+            const subtotal = precio * cantidad;
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td>${nombre}</td>
+                    <td class="text-center">${faltan}</td>
+                    <td class="text-center">${cantidad}</td>
+                    <td class="text-end">${precio.toFixed(2)}€</td>
+                    <td class="text-end">${subtotal.toFixed(2)}€</td>
+                </tr>
+            `;
+            
+            // Guardar proveedor para mostrarlo
+            if (proveedor !== '-') {
+                document.getElementById('proveedorNombre').value = proveedor;
+            }
+        });
+        
+        // Guardar JSON para enviar
+        document.getElementById('productosJson').value = JSON.stringify(productosData);
+        
+        // Abrir modal
+        const modal = new bootstrap.Modal(document.getElementById('modalSolicitudMultiple'));
+        modal.show();
+    });
+    
+    // Filtro automático por proveedor
+    const proveedorSelect = document.getElementById('proveedorSelect');
+    if (proveedorSelect) {
+        proveedorSelect.addEventListener('change', function() {
+            document.getElementById('filtroForm').submit();
+        });
+    }
+});
+</script>
 {% endblock %}

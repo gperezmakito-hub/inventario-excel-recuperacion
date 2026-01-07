@@ -66,19 +66,6 @@
                     <!-- Datos del pedido -->
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Proveedor</label>
-                            {% set primer_producto = solicitud.lineas[0].producto if solicitud.lineas else None %}
-                            <select class="form-select" name="proveedor_id">
-                                {% for prov in proveedores %}
-                                <option value="{{ prov.id }}" 
-                                        {% if primer_producto and primer_producto.proveedor_id == prov.id %}selected{% endif %}>
-                                    {{ prov.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-6">
                             <label class="form-label">Nº Pedido Interno</label>
                             <input type="text" class="form-control" name="numero_pedido" 
                                    value="PED-{{ solicitud.id }}-{{ now.strftime('%Y%m%d') }}">
