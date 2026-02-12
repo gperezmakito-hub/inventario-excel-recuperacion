@@ -62,7 +62,8 @@
                                 <th class="text-center">Stock Actual</th>
                                 <th class="text-center">Solicitado</th>
                                 <th class="text-center">Aprobar</th>
-                                <th class="text-end">Precio Est.</th>
+                                <th class="text-end">Precio Unit. (€)</th>
+                                <th class="text-end">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -78,19 +79,31 @@
                                     </span>
                                 </td>
                                 <td class="text-center">{{ linea.cantidad_solicitada }}</td>
-                                <td class="text-center" style="width: 120px;">
-                                    <input type="number" class="form-control form-control-sm text-center" 
+                                <td class="text-center" style="width: 100px;">
+                                    <input type="number" class="form-control form-control-sm text-center cantidad-input" 
                                            name="cantidad_{{ linea.id }}" 
-                                           value="{{ linea.cantidad_solicitada }}" min="0">
+                                           value="{{ linea.cantidad_solicitada }}" 
+                                           min="0"
+                                           data-linea="{{ linea.id }}">
                                 </td>
-                                <td class="text-end">{{ "%.2f"|format(linea.precio_estimado or 0) }}€</td>
+                                <td class="text-end" style="width: 120px;">
+                                    <input type="number" class="form-control form-control-sm text-end precio-input" 
+                                           name="precio_{{ linea.id }}" 
+                                           value="{{ "%.2f"|format(linea.precio_estimado or 0) }}" 
+                                           min="0" 
+                                           step="0.01"
+                                           data-linea="{{ linea.id }}">
+                                </td>
+                                <td class="text-end subtotal-cell" data-linea="{{ linea.id }}">
+                                    {{ "%.2f"|format((linea.precio_estimado or 0) * linea.cantidad_solicitada) }}€
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <th colspan="4" class="text-end">TOTAL ESTIMADO:</th>
-                                <th class="text-end">{{ "%.2f"|format(solicitud.total_estimado) }}€</th>
+                                <th colspan="5" class="text-end">TOTAL ESTIMADO:</th>
+                                <th class="text-end" id="totalEstimado">{{ "%.2f"|format(solicitud.total_estimado) }}€</th>
                             </tr>
                         </tfoot>
                     </table>
@@ -130,4 +143,33 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calcular subtotales en tiempo real
+function calcularSubtotales() {
+    let total = 0;
+    
+    document.querySelectorAll('.cantidad-input').forEach(cantidadInput => {
+        const lineaId = cantidadInput.dataset.linea;
+        const precioInput = document.querySelector(`.precio-input[data-linea="${lineaId}"]`);
+        const subtotalCell = document.querySelector(`.subtotal-cell[data-linea="${lineaId}"]`);
+        
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        const precio = parseFloat(precioInput.value) || 0;
+        const subtotal = cantidad * precio;
+        
+        subtotalCell.textContent = subtotal.toFixed(2) + '€';
+        total += subtotal;
+    });
+    
+    document.getElementById('totalEstimado').textContent = total.toFixed(2) + '€';
+}
+
+// Agregar event listeners
+document.querySelectorAll('.cantidad-input, .precio-input').forEach(input => {
+    input.addEventListener('input', calcularSubtotales);
+});
+</script>
 {% endblock %}

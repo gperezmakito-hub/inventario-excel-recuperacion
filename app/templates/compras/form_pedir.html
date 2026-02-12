@@ -35,12 +35,14 @@
                     
                     <!-- Productos aprobados -->
                     <h6 class="mb-3">Productos a pedir:</h6>
+                    <p class="text-muted small">Ajusta los precios si el proveedor ofrece descuentos o cambios de precio.</p>
                     <table class="table table-sm">
                         <thead class="table-light">
                             <tr>
                                 <th>Producto</th>
-                                <th class="text-center">Cantidad Aprobada</th>
-                                <th class="text-end">Precio Est.</th>
+                                <th class="text-center">Cantidad</th>
+                                <th class="text-end">Precio Unit. (€)</th>
+                                <th class="text-end">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -53,12 +55,27 @@
                                 <td class="text-center">
                                     <strong>{{ linea.cantidad_aprobada or linea.cantidad_solicitada }}</strong>
                                 </td>
-                                <td class="text-end">
-                                    {{ "%.2f"|format((linea.producto.precio_compra or 0) * (linea.cantidad_aprobada or linea.cantidad_solicitada)) }}€
+                                <td class="text-end" style="width: 120px;">
+                                    <input type="number" class="form-control form-control-sm text-end precio-input" 
+                                           name="precio_{{ linea.id }}" 
+                                           value="{{ "%.2f"|format(linea.precio_estimado or 0) }}" 
+                                           min="0" 
+                                           step="0.01"
+                                           data-linea="{{ linea.id }}"
+                                           data-cantidad="{{ linea.cantidad_aprobada or linea.cantidad_solicitada }}">
+                                </td>
+                                <td class="text-end subtotal-cell" data-linea="{{ linea.id }}">
+                                    {{ "%.2f"|format((linea.precio_estimado or 0) * (linea.cantidad_aprobada or linea.cantidad_solicitada)) }}€
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th colspan="3" class="text-end">TOTAL:</th>
+                                <th class="text-end" id="totalPedido">{{ "%.2f"|format(solicitud.total_estimado) }}€</th>
+                            </tr>
+                        </tfoot>
                     </table>
                     
                     <hr>
@@ -106,4 +123,31 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calcular subtotales en tiempo real
+function calcularSubtotales() {
+    let total = 0;
+    
+    document.querySelectorAll('.precio-input').forEach(precioInput => {
+        const lineaId = precioInput.dataset.linea;
+        const cantidad = parseFloat(precioInput.dataset.cantidad) || 0;
+        const precio = parseFloat(precioInput.value) || 0;
+        const subtotal = cantidad * precio;
+        
+        const subtotalCell = document.querySelector(`.subtotal-cell[data-linea="${lineaId}"]`);
+        subtotalCell.textContent = subtotal.toFixed(2) + '€';
+        total += subtotal;
+    });
+    
+    document.getElementById('totalPedido').textContent = total.toFixed(2) + '€';
+}
+
+// Agregar event listeners
+document.querySelectorAll('.precio-input').forEach(input => {
+    input.addEventListener('input', calcularSubtotales);
+});
+</script>
 {% endblock %}

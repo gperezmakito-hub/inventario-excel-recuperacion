@@ -125,6 +125,7 @@ def nueva():
         # Agregar líneas de productos
         producto_ids = request.form.getlist('producto_id[]')
         cantidades = request.form.getlist('cantidad[]')
+        precios = request.form.getlist('precio[]')
         
         if not producto_ids:
             flash('Debes agregar al menos un producto a la solicitud.', 'warning')
@@ -134,11 +135,14 @@ def nueva():
             if producto_id and cantidades[i]:
                 producto = Producto.query.get(int(producto_id))
                 if producto:
+                    # Usar el precio del formulario si está disponible, sino el del producto
+                    precio = float(precios[i]) if i < len(precios) and precios[i] else producto.precio_compra
+                    
                     linea = LineaSolicitud(
                         solicitud_id=solicitud.id,
                         producto_id=int(producto_id),
                         cantidad_solicitada=int(cantidades[i]),
-                        precio_estimado=producto.precio_compra
+                        precio_estimado=precio
                     )
                     db.session.add(linea)
         
@@ -321,10 +325,16 @@ def aprobar(id):
     if request.method == 'POST':
         estado_anterior = solicitud.estado
         
-        # Actualizar cantidades aprobadas
+        # Actualizar cantidades aprobadas y precios
         for linea in solicitud.lineas:
             cantidad_aprobada = request.form.get(f'cantidad_{linea.id}', type=int)
+            precio_actualizado = request.form.get(f'precio_{linea.id}', type=float)
+            
             linea.cantidad_aprobada = cantidad_aprobada
+            
+            # Actualizar precio estimado si se modificó
+            if precio_actualizado is not None:
+                linea.precio_estimado = precio_actualizado
         
         solicitud.estado = 'aprobada'
         solicitud.aprobado_por_id = current_user.id
@@ -398,6 +408,12 @@ def pedir(id):
     
     if request.method == 'POST':
         estado_anterior = solicitud.estado
+        
+        # Actualizar precios si se modificaron
+        for linea in solicitud.lineas:
+            precio_final = request.form.get(f'precio_{linea.id}', type=float)
+            if precio_final is not None:
+                linea.precio_real = precio_final
         
         solicitud.estado = 'pedida'
         solicitud.fecha_pedido = datetime.now()
