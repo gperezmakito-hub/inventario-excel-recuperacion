@@ -153,6 +153,7 @@ def nueva():
     # Productos con stock bajo para sugerir
     productos_stock_bajo = Producto.query.filter(
         Producto.stock_actual <= Producto.stock_minimo,
+        Producto.stock_minimo > 0,
         Producto.activo == True
     ).order_by(Producto.nombre).all()
     
@@ -574,6 +575,7 @@ def api_productos_stock_bajo():
     """API: Productos con stock bajo"""
     productos = Producto.query.filter(
         Producto.stock_actual <= Producto.stock_minimo,
+        Producto.stock_minimo > 0,
         Producto.activo == True
     ).all()
     

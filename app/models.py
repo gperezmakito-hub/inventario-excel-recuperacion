@@ -135,8 +135,8 @@ class Producto(db.Model):
     
     @property
     def stock_bajo(self):
-        """Retorna True si el stock está por debajo del mínimo"""
-        return self.stock_actual <= self.stock_minimo
+        """Retorna True si el stock está por debajo del mínimo (solo si stock_minimo > 0)"""
+        return self.stock_minimo > 0 and self.stock_actual <= self.stock_minimo
     
     @property
     def valor_inventario(self):

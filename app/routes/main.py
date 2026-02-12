@@ -30,6 +30,7 @@ def dashboard():
         'total_proveedores': Proveedor.query.filter_by(activo=True).count(),
         'productos_stock_bajo': Producto.query.filter(
             Producto.stock_actual <= Producto.stock_minimo,
+            Producto.stock_minimo > 0,
             Producto.activo == True
         ).count(),
     }
@@ -59,6 +60,7 @@ def dashboard():
     # Productos con stock bajo (para la tabla de alertas)
     productos_stock_bajo = Producto.query.filter(
         Producto.stock_actual <= Producto.stock_minimo,
+        Producto.stock_minimo > 0,
         Producto.activo == True
     ).order_by(Producto.stock_actual).limit(10).all()
     

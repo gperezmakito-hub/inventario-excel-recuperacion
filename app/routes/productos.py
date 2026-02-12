@@ -58,7 +58,10 @@ def listar():
         query = query.filter_by(proveedor_id=proveedor_id)
     
     if stock_bajo:
-        query = query.filter(Producto.stock_actual <= Producto.stock_minimo)
+        query = query.filter(
+            Producto.stock_actual <= Producto.stock_minimo,
+            Producto.stock_minimo > 0
+        )
     
     # Ordenar y paginar
     productos = query.order_by(Producto.nombre).paginate(
@@ -201,6 +204,7 @@ def stock_bajo():
     
     query = Producto.query.filter(
         Producto.stock_actual <= Producto.stock_minimo,
+        Producto.stock_minimo > 0,
         Producto.activo == True
     )
     
@@ -218,6 +222,7 @@ def stock_bajo():
         Producto, Producto.proveedor_id == Proveedor.id
     ).filter(
         Producto.stock_actual <= Producto.stock_minimo,
+        Producto.stock_minimo > 0,
         Producto.activo == True,
         Proveedor.activo == True
     ).group_by(Proveedor.id).order_by(Proveedor.nombre).all()

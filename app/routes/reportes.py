@@ -36,7 +36,10 @@ def inventario():
     if proveedor_id:
         query = query.filter_by(proveedor_id=proveedor_id)
     if solo_stock_bajo:
-        query = query.filter(Producto.stock_actual <= Producto.stock_minimo)
+        query = query.filter(
+            Producto.stock_actual <= Producto.stock_minimo,
+            Producto.stock_minimo > 0
+        )
     
     productos = query.order_by(Producto.nombre).all()
     
