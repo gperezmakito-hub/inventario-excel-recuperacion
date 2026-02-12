@@ -2,10 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
 *.so
 .Python
 env/
 venv/
+.venv/
 ENV/
 
 # IDEs
@@ -21,3 +23,15 @@ Thumbs.db
 # Project specific
 *.log
 *.tmp
+
+# Archivos temporales Excel
+excel_extraido/
+*.zip
+~$*.xlsx
+~$*.xlsm
+
+# Archivos de respaldo antiguos
+INVENTARIO_SIN_*.xlsm
+INVENTARIO_SIN_*.xlsx
+INVENTARIO_RECUPERADO.xlsx
+INVENTARIO_DATOS_RECUPERADOS.xlsx
