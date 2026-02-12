@@ -1,9 +1,10 @@
 module.exports = {
   apps: [{
     name: 'inventario-tintas',
-    script: '/usr/bin/python3',
-    args: '-m gunicorn -w 4 -b 0.0.0.0:5010 app:app',
+    script: './venv/bin/gunicorn',
+    args: '-w 4 -b 0.0.0.0:5010 app:app',
     cwd: '/root/inventario-excel-recuperacion',
+    interpreter: 'none',
     instances: 1,
     autorestart: true,
     watch: false,
