@@ -18,7 +18,7 @@ sudo apt-get update
 
 # Instalar dependencias del sistema
 echo "📦 Instalando dependencias..."
-sudo apt-get install -y python3 python3-pip python3-venv postgresql postgresql-contrib git nodejs npm
+sudo apt-get install -y python3 python3-pip python3-venv python3-dev mysql-server libmysqlclient-dev git nodejs npm
 
 # Instalar PM2 globalmente
 echo "📦 Instalando PM2..."
@@ -46,26 +46,22 @@ echo "📦 Instalando dependencias Python..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Configurar PostgreSQL
-echo "🗄️  Configurando base de datos PostgreSQL..."
+# Configurar MySQL
+echo "🗄️  Configurando base de datos MySQL..."
+
+# Asegurarse de que MySQL esté corriendo
+sudo systemctl start mysql
+sudo systemctl enable mysql
 
 # Crear usuario y base de datos
-sudo -u postgres psql <<EOF
--- Crear usuario si no existe
-DO \$\$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = '$DB_USER') THEN
-        CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';
-    END IF;
-END
-\$\$;
-
+sudo mysql <<EOF
 -- Crear base de datos si no existe
-SELECT 'CREATE DATABASE $DB_NAME OWNER $DB_USER'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
+CREATE DATABASE IF NOT EXISTS $DB_NAME;
 
--- Dar permisos
-GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
+-- Crear usuario si no existe y dar permisos
+CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
 EOF
 
 echo "✅ Base de datos configurada"
@@ -76,7 +72,7 @@ if [ ! -f ".env" ]; then
     cat > .env <<EOF
 PORT=5010
 FLASK_ENV=production
-DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@localhost/$DB_NAME
+DATABASE_URL=mysql+pymysql://$DB_USER:$DB_PASSWORD@localhost/$DB_NAME
 SECRET_KEY=$(openssl rand -hex 32)
 DEBUG=False
 EOF

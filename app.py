@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuración
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost/inventario_tintas')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'mysql+pymysql://inventario_user:password@localhost/inventario_tintas?charset=utf8mb4')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 

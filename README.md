@@ -9,7 +9,7 @@ Esta aplicación proporciona una API REST completa para gestionar el inventario 
 ## 📋 Características
 
 - ✅ API REST completa (CRUD de productos y movimientos)
-- ✅ Base de datos PostgreSQL
+- ✅ Base de datos MySQL
 - ✅ Gestión de stock en tiempo real
 - ✅ Control de movimientos (entrada/salida/ajuste)
 - ✅ Estadísticas de inventario
@@ -19,7 +19,7 @@ Esta aplicación proporciona una API REST completa para gestionar el inventario 
 ## 🛠️ Tecnologías
 
 - **Backend:** Python 3, Flask
-- **Base de datos:** PostgreSQL
+- **Base de datos:** MySQL
 - **Servidor:** Gunicorn + PM2
 - **ORM:** SQLAlchemy
 
@@ -48,9 +48,9 @@ bash deploy.sh
 ```
 
 El script automáticamente:
-1. ✅ Instala todas las dependencias (Python, PostgreSQL, Node.js, PM2)
+1. ✅ Instala todas las dependencias (Python, MySQL, Node.js, PM2)
 2. ✅ Clona el repositorio
-3. ✅ Crea la base de datos PostgreSQL
+3. ✅ Crea la base de datos MySQL
 4. ✅ Configura el entorno virtual Python
 5. ✅ Crea las tablas de la base de datos
 6. ✅ Inicia la aplicación con PM2 en el puerto 5010
