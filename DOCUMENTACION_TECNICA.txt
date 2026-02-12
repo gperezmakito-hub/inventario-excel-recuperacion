@@ -1,0 +1,981 @@
+================================================================================
+  DOCUMENTACIÓN TÉCNICA - SISTEMA DE INVENTARIO DE TINTAS
+================================================================================
+
+ÍNDICE:
+1. Arquitectura de la Aplicación
+2. Estructura de Archivos y Carpetas
+3. Base de Datos - Modelos y Relaciones
+4. Sistema de Rutas (Blueprints)
+5. Templates y Vistas
+6. Flujo de Trabajo de Compras
+7. Autenticación y Permisos
+8. Guía para Modificaciones Comunes
+9. Variables de Configuración
+10. Despliegue y Mantenimiento
+
+================================================================================
+1. ARQUITECTURA DE LA APLICACIÓN
+================================================================================
+
+TECNOLOGÍAS:
+- Framework: Flask 3.0.0 (Python)
+- ORM: SQLAlchemy (Flask-SQLAlchemy 3.1.1)
+- Base de datos: MySQL/MariaDB (PyMySQL 1.1.0)
+- Autenticación: Flask-Login 0.6.3
+- Templates: Jinja2 (incluido en Flask)
+- Frontend: Bootstrap 5 + Bootstrap Icons
+
+PATRÓN DE DISEÑO:
+- Application Factory Pattern: La app se crea mediante create_app() en app/__init__.py
+- Blueprints: Cada módulo (productos, compras, etc.) es un blueprint independiente
+- MVC: Modelos (models.py), Vistas (templates/), Controladores (routes/)
+
+FLUJO DE INICIALIZACIÓN:
+1. run.py → Punto de entrada
+2. app/__init__.py → create_app() crea la aplicación
+3. config.py → Carga configuración desde variables de entorno
+4. Se registran blueprints y se inicializa la base de datos
+5. Flask-Login configura el sistema de autenticación
+
+================================================================================
+2. ESTRUCTURA DE ARCHIVOS Y CARPETAS
+================================================================================
+
+inventario-tintas/
+│
+├── run.py                      # Punto de entrada de la aplicación
+├── config.py                   # Configuraciones (dev, production)
+├── requirements.txt            # Dependencias Python
+├── .env                        # Variables de entorno (NO subir a git)
+├── .env.example               # Plantilla de variables de entorno
+├── .gitignore                 # Archivos ignorados por git
+├── setup.bat                  # Script de instalación (Windows)
+├── iniciar.bat                # Script para iniciar app (Windows)
+│
+├── app/                       # Paquete principal de la aplicación
+│   ├── __init__.py           # Factory de la app, inicializa extensiones
+│   ├── models.py             # Modelos SQLAlchemy (tablas de BD)
+│   │
+│   ├── routes/               # Blueprints (controladores)
+│   │   ├── __init__.py
+│   │   ├── main.py           # Dashboard y rutas principales
+│   │   ├── auth.py           # Login, logout, perfil
+│   │   ├── productos.py      # CRUD de productos, stock
+│   │   ├── movimientos.py    # Entradas y salidas de inventario
+│   │   ├── proveedores.py    # CRUD de proveedores
+│   │   ├── compras.py        # Workflow de solicitudes de compra
+│   │   └── reportes.py       # Reportes e informes
+│   │
+│   └── templates/            # Plantillas HTML (Jinja2)
+│       ├── base.html         # Template base con navbar y estructura
+│       ├── dashboard.html    # Página principal
+│       │
+│       ├── auth/             # Login y perfil
+│       ├── productos/        # Vistas de productos
+│       ├── movimientos/      # Entradas y salidas
+│       ├── proveedores/      # Vistas de proveedores
+│       ├── compras/          # Solicitudes de compra
+│       └── reportes/         # Informes
+│
+└── scripts/                  # Scripts auxiliares
+    ├── migrar_excel.py       # Importar datos desde Excel
+    └── actualizar_proveedores.py
+
+================================================================================
+3. BASE DE DATOS - MODELOS Y RELACIONES
+================================================================================
+
+ARCHIVO: app/models.py
+
+TABLAS PRINCIPALES:
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ usuarios                                                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - username (unique)                                                     │
+│ - password_hash                                                         │
+│ - nombre_completo                                                       │
+│ - email                                                                 │
+│ - rol: 'admin', 'oficina', 'almacen', 'consulta'                      │
+│ - activo                                                                │
+│ - fecha_creacion                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ proveedores                                                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - nombre                                                                │
+│ - contacto                                                              │
+│ - telefono, email                                                       │
+│ - direccion, ciudad, codigo_postal                                      │
+│ - activo                                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ categorias                                                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - nombre                                                                │
+│ - activo                                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ zonas_stock                                                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - nombre (ej: 'Estantería A1', 'Almacén Principal')                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ productos                                                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - codigo_ean (unique, index)                                            │
+│ - codigo_proveedor                                                       │
+│ - nombre                                                                │
+│ - color                                                                 │
+│ - peso_unidad                                                            │
+│ - stock_actual (cantidad en almacén)                                     │
+│ - stock_minimo (alerta si stock <= stock_minimo)                        │
+│ - precio_compra                                                          │
+│ - dto_1, dto_2 (descuentos)                                              │
+│ - categoria_id (FK → categorias)                                         │
+│ - zona_id (FK → zonas_stock)                                             │
+│ - proveedor_id (FK → proveedores)                                        │
+│ - activo, descatalogado                                                  │
+│ - fecha_creacion, fecha_ultima_entrada, fecha_ultima_salida             │
+│                                                                          │
+│ PROPIEDADES CALCULADAS:                                                 │
+│ - stock_bajo: True si stock_minimo > 0 y stock_actual <= stock_minimo   │
+│ - valor_inventario: stock_actual * precio_compra                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ entradas (movimientos de entrada al inventario)                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - numero_registro (unique, autoincremental)                              │
+│ - fecha                                                                 │
+│ - producto_id (FK → productos)                                           │
+│ - cantidad                                                              │
+│ - albaran (número de albarán)                                            │
+│ - factura (número de factura)                                            │
+│ - precio_unitario                                                        │
+│ - proveedor_id (FK → proveedores)                                        │
+│ - usuario_id (FK → usuarios, quien registra)                             │
+│ - solicitud_id (FK → solicitudes_compra, opcional)                       │
+│ - notas                                                                 │
+│                                                                          │
+│ PROPIEDAD CALCULADA:                                                     │
+│ - precio_total: cantidad * precio_unitario                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ salidas (movimientos de salida del inventario)                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - numero_registro (unique, autoincremental)                              │
+│ - fecha                                                                 │
+│ - producto_id (FK → productos)                                           │
+│ - cantidad                                                              │
+│ - destino (departamento, proyecto, etc.)                                 │
+│ - usuario_id (FK → usuarios)                                             │
+│ - notas                                                                 │
+│                                                                          │
+│ PROPIEDAD CALCULADA:                                                     │
+│ - valor: producto.precio_compra * cantidad                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ solicitudes_compra (workflow de compras)                                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - numero (ej: 'SC-2026-001')                                             │
+│ - estado: 'pendiente', 'aprobada', 'rechazada', 'pedida',               │
+│           'en_transito', 'recibida', 'cancelada'                         │
+│ - prioridad: 'normal', 'alta', 'urgente'                                │
+│ - proveedor_id (FK → proveedores)                                        │
+│                                                                          │
+│ CREACIÓN:                                                                │
+│ - creado_por_id (FK → usuarios)                                          │
+│ - fecha_creacion                                                        │
+│ - motivo                                                                │
+│                                                                          │
+│ APROBACIÓN:                                                              │
+│ - aprobado_por_id (FK → usuarios)                                        │
+│ - fecha_aprobacion                                                      │
+│ - notas_aprobacion                                                       │
+│                                                                          │
+│ PEDIDO:                                                                  │
+│ - fecha_pedido                                                          │
+│ - numero_pedido_proveedor                                                │
+│                                                                          │
+│ SEGUIMIENTO:                                                             │
+│ - fecha_envio_proveedor                                                  │
+│ - fecha_entrega_estimada                                                 │
+│ - numero_seguimiento                                                     │
+│                                                                          │
+│ RECEPCIÓN:                                                               │
+│ - fecha_recepcion                                                       │
+│ - recibido_por_id (FK → usuarios)                                        │
+│ - notas_recepcion                                                        │
+│                                                                          │
+│ PROPIEDADES CALCULADAS:                                                 │
+│ - total_estimado: suma de subtotales de líneas                           │
+│ - puede_aprobar(): True si estado == 'pendiente'                         │
+│ - puede_rechazar(): True si estado == 'pendiente'                        │
+│ - puede_pedir(): True si estado == 'aprobada'                            │
+│ - puede_marcar_enviado(): True si estado == 'pedida'                     │
+│ - puede_recibir(): True si estado in ['pedida', 'en_transito']          │
+│                                                                          │
+│ MÉTODO ESTÁTICO:                                                         │
+│ - generar_numero(): Genera número único SC-YYYY-NNN                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ lineas_solicitud (productos en una solicitud de compra)                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - solicitud_id (FK → solicitudes_compra)                                 │
+│ - producto_id (FK → productos)                                           │
+│ - cantidad_solicitada                                                    │
+│ - cantidad_aprobada                                                      │
+│ - cantidad_recibida                                                      │
+│ - precio_estimado (precio inicial/estimado)                              │
+│ - precio_real (precio final confirmado al pedir/recibir)                 │
+│ - notas                                                                 │
+│                                                                          │
+│ PROPIEDAD CALCULADA:                                                     │
+│ - subtotal: (cantidad_aprobada o cantidad_solicitada) *                  │
+│              (precio_real o precio_estimado)                             │
+│                                                                          │
+│ NOTA: precio_estimado se ajusta en aprobación, precio_real en pedido     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ historial_solicitudes (auditoría de cambios)                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - id (PK)                                                               │
+│ - solicitud_id (FK → solicitudes_compra)                                 │
+│ - usuario_id (FK → usuarios)                                             │
+│ - fecha                                                                 │
+│ - estado_anterior                                                        │
+│ - estado_nuevo                                                           │
+│ - accion (descripción del cambio)                                        │
+│ - comentario                                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+
+RELACIONES IMPORTANTES:
+- Un Producto pertenece a una Categoría (N:1)
+- Un Producto pertenece a un Proveedor (N:1)
+- Un Producto tiene muchas Entradas (1:N)
+- Un Producto tiene muchas Salidas (1:N)
+- Una Solicitud tiene muchas Líneas (1:N)
+- Una Solicitud tiene muchos Historiales (1:N)
+
+================================================================================
+4. SISTEMA DE RUTAS (BLUEPRINTS)
+================================================================================
+
+Cada módulo es un Blueprint registrado en app/__init__.py
+
+────────────────────────────────────────────────────────────────────────────
+MAIN (app/routes/main.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /
+- /                         → Redirige a /dashboard o /login
+- /dashboard                → Dashboard principal con estadísticas
+
+────────────────────────────────────────────────────────────────────────────
+AUTH (app/routes/auth.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /auth
+- /auth/login               → Formulario de login
+- /auth/logout              → Cerrar sesión
+- /auth/perfil              → Ver y editar perfil del usuario
+- /auth/cambiar-password    → Cambiar contraseña
+
+────────────────────────────────────────────────────────────────────────────
+PRODUCTOS (app/routes/productos.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /productos
+- /productos/                       → Listar productos con filtros
+- /productos/<id>                   → Ver detalle de producto
+- /productos/nuevo                  → Crear nuevo producto
+- /productos/<id>/editar            → Editar producto
+- /productos/stock-bajo             → Productos con stock bajo
+- /productos/api/buscar?q=...       → API búsqueda (autocompletado)
+
+DECORADORES:
+- @requiere_permiso_edicion: Solo admin y oficina pueden crear/editar
+
+────────────────────────────────────────────────────────────────────────────
+MOVIMIENTOS (app/routes/movimientos.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /movimientos
+
+ENTRADAS:
+- /movimientos/entradas/            → Listar entradas
+- /movimientos/entradas/nueva       → Registrar nueva entrada
+
+SALIDAS:
+- /movimientos/salidas/             → Listar salidas
+- /movimientos/salidas/nueva        → Registrar nueva salida
+
+────────────────────────────────────────────────────────────────────────────
+PROVEEDORES (app/routes/proveedores.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /proveedores
+- /proveedores/                     → Listar proveedores
+- /proveedores/<id>                 → Ver detalle de proveedor
+- /proveedores/nuevo                → Crear nuevo proveedor
+- /proveedores/<id>/editar          → Editar proveedor
+
+────────────────────────────────────────────────────────────────────────────
+COMPRAS (app/routes/compras.py) - WORKFLOW COMPLETO
+────────────────────────────────────────────────────────────────────────────
+URL: /compras
+
+LISTADOS:
+- /compras/                         → Listar todas las solicitudes
+- /compras/<id>                     → Ver detalle de solicitud
+- /compras/pendientes               → Solicitudes pendientes de aprobar
+- /compras/en-curso                 → Solicitudes pedidas/en tránsito
+
+CREAR SOLICITUD (Almacén):
+- /compras/nueva                    → Crear nueva solicitud
+- /compras/rapida/<producto_id>     → Solicitud rápida desde stock bajo
+- /compras/nueva-desde-stock        → Solicitud múltiple desde stock bajo
+
+APROBAR/RECHAZAR (Oficina):
+- /compras/<id>/aprobar             → Aprobar solicitud (ajustar cantidades y precios)
+- /compras/<id>/rechazar            → Rechazar solicitud
+
+PEDIR (Oficina):
+- /compras/<id>/pedir               → Registrar pedido al proveedor (ajustar precios finales)
+- /compras/<id>/marcar-enviado      → Marcar como enviado por proveedor
+
+RECIBIR (Almacén):
+- /compras/<id>/recibir             → Recibir pedido (actualiza stock)
+
+CANCELAR:
+- /compras/<id>/cancelar            → Cancelar solicitud
+
+API:
+- /compras/api/productos-stock-bajo → JSON de productos con stock bajo
+
+DECORADORES:
+- @requiere_permiso_aprobar: Solo admin y oficina pueden aprobar/pedir
+
+────────────────────────────────────────────────────────────────────────────
+REPORTES (app/routes/reportes.py)
+────────────────────────────────────────────────────────────────────────────
+URL: /reportes
+- /reportes/                        → Índice de reportes
+- /reportes/inventario              → Reporte de inventario actual
+- /reportes/movimientos             → Reporte de entradas y salidas
+- /reportes/compras                 → Reporte de solicitudes de compra
+- /reportes/valoracion              → Valoración del inventario
+
+================================================================================
+5. TEMPLATES Y VISTAS
+================================================================================
+
+ESTRUCTURA BASE:
+- base.html: Template principal con navbar, sidebar, scripts comunes
+  - Navbar con usuario logueado y logout
+  - Sidebar con menú de navegación según permisos
+  - Bloques Jinja2: {% block title %}, {% block content %}, {% block extra_js %}
+
+SISTEMA DE BLOQUES:
+{% extends "base.html" %}
+
+{% block title %}Título de la página{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="...">Inicio</a></li>
+    <li class="breadcrumb-item active">Página actual</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<!-- Contenido principal de la página -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// JavaScript específico de la página
+</script>
+{% endblock %}
+
+VARIABLES GLOBALES EN TEMPLATES:
+- current_user: Usuario logueado (Flask-Login)
+  - current_user.nombre_completo
+  - current_user.rol
+  - current_user.puede_editar_productos()
+  - current_user.puede_aprobar_compras()
+  
+- url_for(): Generar URLs
+  - url_for('productos.listar')
+  - url_for('compras.ver', id=solicitud.id)
+
+FILTROS JINJA2 COMUNES:
+- {{ fecha|strftime('%d/%m/%Y') }}
+- {{ precio|format('%.2f') }}€
+- {{ texto|capitalize }}
+
+================================================================================
+6. FLUJO DE TRABAJO DE COMPRAS (WORKFLOW)
+================================================================================
+
+ESTADOS DE UNA SOLICITUD:
+1. pendiente     → Creada por almacén, esperando aprobación
+2. aprobada      → Aprobada por oficina, puede pedirse
+3. rechazada     → Rechazada por oficina
+4. pedida        → Pedido realizado al proveedor
+5. en_transito   → Enviado por proveedor, en camino
+6. recibida      → Recibida en almacén, stock actualizado
+7. cancelada     → Cancelada en cualquier momento
+
+FLUJO COMPLETO:
+
+┌────────────────┐
+│ 1. SOLICITUD   │ (Almacén)
+│ Estado:        │
+│ pendiente      │ - Desde página "Stock Bajo" o manualmente
+└────────┬───────┘ - Se agregan productos con cantidades y precios
+         │         - Precio inicial: precio_compra del producto
+         │         - PUEDE AJUSTARSE en esta fase
+         ↓
+┌────────────────┐
+│ 2. APROBACIÓN  │ (Oficina)
+│ Estado:        │
+│ aprobada       │ - Revisa solicitud
+└────────┬───────┘ - Ajusta cantidades si es necesario
+         │         - PUEDE AJUSTAR PRECIOS (ofertas del proveedor)
+         │         - Precios se guardan en precio_estimado
+         │         - Asigna/confirma proveedor
+         ↓
+┌────────────────┐
+│ 3. PEDIDO      │ (Oficina)
+│ Estado:        │
+│ pedida         │ - Registra pedido al proveedor
+└────────┬───────┘ - Número de pedido
+         │         - Fecha estimada de entrega
+         │         - ÚLTIMA OPORTUNIDAD PARA AJUSTAR PRECIOS
+         │         - Precios finales se guardan en precio_real
+         ↓
+┌────────────────┐
+│ 4. ENVÍO       │ (Cualquiera)
+│ Estado:        │
+│ en_transito    │ - Marca como enviado por proveedor
+└────────┬───────┘ - Número de seguimiento (opcional)
+         │
+         ↓
+┌────────────────┐
+│ 5. RECEPCIÓN   │ (Almacén)
+│ Estado:        │
+│ recibida       │ - Registra recepción
+└────────────────┘ - Albarán y factura
+                   - Actualiza stock_actual de productos
+                   - Crea registros de Entrada
+                   - Actualiza precio_compra si precio_real cambió
+
+GESTIÓN DE PRECIOS POR OPERACIÓN:
+1. Nueva solicitud: precio_estimado = precio del formulario (editable)
+2. Aprobación: precio_estimado puede ajustarse (ofertas/descuentos)
+3. Pedido: precio_real se guarda como precio final confirmado
+4. Recepción: usa precio_real para actualizar inventario
+   - NO modifica precio_compra del producto por defecto
+   - Solo se actualiza si hay diferencia significativa
+
+HISTORIAL:
+- Cada cambio de estado se registra en historial_solicitudes
+- Función: registrar_historial(solicitud, estado_anterior, estado_nuevo, accion, comentario)
+
+================================================================================
+7. AUTENTICACIÓN Y PERMISOS
+================================================================================
+
+SISTEMA: Flask-Login
+MODELO: Usuario (app/models.py)
+
+ROLES:
+1. admin      → Todos los permisos
+2. oficina    → Aprobar compras, editar productos, reportes
+3. almacen    → Crear solicitudes, registrar entradas/salidas
+4. consulta   → Solo lectura
+
+MÉTODOS DEL USUARIO:
+- puede_editar_productos(): admin o oficina
+- puede_aprobar_compras(): admin o oficina
+- puede_ver_reportes(): admin, oficina o almacen
+
+DECORADORES:
+@login_required                    # Requiere estar logueado
+@requiere_permiso_edicion          # Solo admin o oficina
+@requiere_permiso_aprobar          # Solo admin o oficina
+
+CREAR USUARIOS:
+En Python shell o script:
+```python
+from app import create_app, db
+from app.models import Usuario
+
+app = create_app()
+with app.app_context():
+    usuario = Usuario(
+        username='nuevo_usuario',
+        nombre_completo='Nombre Completo',
+        email='email@ejemplo.com',
+        rol='almacen'
+    )
+    usuario.set_password('contraseña')
+    db.session.add(usuario)
+    db.session.commit()
+```
+
+================================================================================
+8. GUÍA PARA MODIFICACIONES COMUNES
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+A) AGREGAR UN NUEVO CAMPO A UN PRODUCTO
+────────────────────────────────────────────────────────────────────────────
+
+1. Modificar el modelo (app/models.py):
+   ```python
+   class Producto(db.Model):
+       # ... campos existentes ...
+       nuevo_campo = db.Column(db.String(100))
+   ```
+
+2. Actualizar base de datos:
+   - MySQL: ALTER TABLE productos ADD COLUMN nuevo_campo VARCHAR(100);
+   - O usar Flask-Migrate si está configurado
+
+3. Actualizar formulario (app/templates/productos/form.html):
+   ```html
+   <div class="col-md-6">
+       <label class="form-label">Nuevo Campo</label>
+       <input type="text" class="form-control" name="nuevo_campo" 
+              value="{{ producto.nuevo_campo or '' }}">
+   </div>
+   ```
+
+4. Actualizar rutas (app/routes/productos.py):
+   ```python
+   # En nueva() y editar():
+   producto.nuevo_campo = request.form.get('nuevo_campo', '').strip() or None
+   ```
+
+────────────────────────────────────────────────────────────────────────────
+B) CREAR UNA NUEVA RUTA/PÁGINA
+────────────────────────────────────────────────────────────────────────────
+
+1. Agregar ruta en el blueprint correspondiente (ej: app/routes/productos.py):
+   ```python
+   @productos_bp.route('/mi-nueva-pagina')
+   @login_required
+   def mi_nueva_pagina():
+       datos = Producto.query.all()
+       return render_template('productos/mi_pagina.html', datos=datos)
+   ```
+
+2. Crear template (app/templates/productos/mi_pagina.html):
+   ```html
+   {% extends "base.html" %}
+   {% block title %}Mi Nueva Página{% endblock %}
+   {% block content %}
+       <h1>Contenido</h1>
+       {% for item in datos %}
+           <p>{{ item.nombre }}</p>
+       {% endfor %}
+   {% endblock %}
+   ```
+
+3. Agregar enlace en navbar/sidebar (app/templates/base.html):
+   ```html
+   <a href="{{ url_for('productos.mi_nueva_pagina') }}" class="nav-link">
+       Mi Página
+   </a>
+   ```
+
+────────────────────────────────────────────────────────────────────────────
+C) AGREGAR UN NUEVO FILTRO EN CONSULTAS
+────────────────────────────────────────────────────────────────────────────
+
+Ejemplo en app/routes/productos.py, función listar():
+
+```python
+# Obtener parámetro del formulario
+nuevo_filtro = request.args.get('nuevo_filtro', type=int)
+
+# Aplicar filtro en la query
+if nuevo_filtro:
+    query = query.filter(Producto.campo == nuevo_filtro)
+```
+
+En el template:
+```html
+<select class="form-select" name="nuevo_filtro">
+    <option value="">Todos</option>
+    <option value="1" {% if filtros.nuevo_filtro == 1 %}selected{% endif %}>
+        Opción 1
+    </option>
+</select>
+```
+
+────────────────────────────────────────────────────────────────────────────
+D) MODIFICAR CÁLCULOS O PROPIEDADES
+────────────────────────────────────────────────────────────────────────────
+
+Propiedades calculadas en modelos (app/models.py):
+
+```python
+class Producto(db.Model):
+    # ...
+    
+    @property
+    def nueva_propiedad(self):
+        """Cálculo personalizado"""
+        return self.campo1 * self.campo2
+```
+
+Uso en templates:
+```html
+{{ producto.nueva_propiedad }}
+```
+
+────────────────────────────────────────────────────────────────────────────
+E) AGREGAR VALIDACIONES
+────────────────────────────────────────────────────────────────────────────
+
+En las rutas (app/routes/productos.py):
+
+```python
+if request.method == 'POST':
+    # Validar campo obligatorio
+    if not request.form.get('nombre'):
+        flash('El nombre es obligatorio.', 'danger')
+        return redirect(url_for('productos.nuevo'))
+    
+    # Validar formato
+    email = request.form.get('email')
+    if email and '@' not in email:
+        flash('Email inválido.', 'danger')
+        return redirect(url_for('productos.nuevo'))
+    
+    # Validar unicidad
+    codigo = request.form.get('codigo')
+    if Producto.query.filter_by(codigo=codigo).first():
+        flash('El código ya existe.', 'danger')
+        return redirect(url_for('productos.nuevo'))
+```
+
+────────────────────────────────────────────────────────────────────────────
+F) MODIFICAR PERMISOS
+────────────────────────────────────────────────────────────────────────────
+
+En app/models.py, clase Usuario:
+
+```python
+def nuevo_permiso(self):
+    """Define quién tiene este permiso"""
+    return self.rol in ['admin', 'oficina']
+```
+
+Crear decorador en app/routes/ (ej: compras.py):
+
+```python
+def requiere_nuevo_permiso(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.nuevo_permiso():
+            flash('No tienes permiso.', 'danger')
+            return redirect(url_for('main.dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
+```
+
+Usar en ruta:
+```python
+@compras_bp.route('/accion-especial')
+@login_required
+@requiere_nuevo_permiso
+def accion_especial():
+    pass
+```
+
+────────────────────────────────────────────────────────────────────────────
+G) AGREGAR EXPORTACIÓN A CSV/EXCEL
+────────────────────────────────────────────────────────────────────────────
+
+En app/routes/reportes.py:
+
+```python
+import csv
+import io
+from flask import Response
+
+@reportes_bp.route('/exportar-productos')
+@login_required
+def exportar_productos():
+    productos = Producto.query.filter_by(activo=True).all()
+    
+    # Crear CSV en memoria
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Encabezados
+    writer.writerow(['Código', 'Nombre', 'Stock', 'Precio'])
+    
+    # Datos
+    for p in productos:
+        writer.writerow([p.codigo_ean, p.nombre, p.stock_actual, p.precio_compra])
+    
+    # Preparar respuesta
+    output.seek(0)
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=productos.csv'}
+    )
+```
+
+────────────────────────────────────────────────────────────────────────────
+H) MODIFICAR EL WORKFLOW DE COMPRAS
+────────────────────────────────────────────────────────────────────────────
+
+1. Agregar nuevo estado en app/models.py:
+   ```python
+   # En SolicitudCompra, agregar método para el nuevo estado:
+   def puede_nuevo_estado(self):
+       return self.estado == 'estado_previo'
+   ```
+
+2. Crear ruta para la acción (app/routes/compras.py):
+   ```python
+   @compras_bp.route('/<int:id>/nueva-accion', methods=['GET', 'POST'])
+   @login_required
+   def nueva_accion(id):
+       solicitud = SolicitudCompra.query.get_or_404(id)
+       
+       if not solicitud.puede_nuevo_estado():
+           flash('No se puede realizar esta acción.', 'warning')
+           return redirect(url_for('compras.ver', id=id))
+       
+       if request.method == 'POST':
+           estado_anterior = solicitud.estado
+           solicitud.estado = 'nuevo_estado'
+           
+           registrar_historial(solicitud, estado_anterior, 'nuevo_estado',
+                              'Descripción de la acción')
+           
+           db.session.commit()
+           flash('Acción completada.', 'success')
+           return redirect(url_for('compras.ver', id=id))
+       
+       return render_template('compras/form_nueva_accion.html', 
+                            solicitud=solicitud)
+   ```
+
+3. Actualizar template de detalle (app/templates/compras/ver.html):
+   ```html
+   {% if solicitud.puede_nuevo_estado() %}
+   <a href="{{ url_for('compras.nueva_accion', id=solicitud.id) }}" 
+      class="btn btn-primary">
+       Nueva Acción
+   </a>
+   {% endif %}
+   ```
+
+================================================================================
+9. VARIABLES DE CONFIGURACIÓN
+================================================================================
+
+ARCHIVO: .env (NO subir a git, usar .env.example como plantilla)
+
+VARIABLES:
+```
+# Flask
+FLASK_APP=run.py
+FLASK_ENV=development                # o 'production'
+SECRET_KEY=clave-secreta-larga       # Cambiar en producción
+
+# MySQL
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=tu_password
+MYSQL_DATABASE=inventario_tintas
+```
+
+ARCHIVO: config.py
+
+Configuraciones por entorno:
+- DevelopmentConfig: Debug activado, base de datos local
+- ProductionConfig: Debug desactivado, configuración para servidor
+
+Cargar configuración en app/__init__.py:
+```python
+app.config.from_object(f'config.{config_name.title()}Config')
+```
+
+================================================================================
+10. DESPLIEGUE Y MANTENIMIENTO
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────
+INSTALACIÓN INICIAL
+────────────────────────────────────────────────────────────────────────────
+
+1. Clonar repositorio
+2. Ejecutar setup.bat (Windows) o:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/Mac
+   .venv\Scripts\activate     # Windows
+   pip install -r requirements.txt
+   ```
+
+3. Configurar .env con credenciales de base de datos
+
+4. Crear base de datos MySQL:
+   ```sql
+   CREATE DATABASE inventario_tintas 
+   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+5. Ejecutar aplicación (crea tablas automáticamente):
+   ```bash
+   python run.py
+   ```
+
+────────────────────────────────────────────────────────────────────────────
+BACKUP DE BASE DE DATOS
+────────────────────────────────────────────────────────────────────────────
+
+MySQL:
+```bash
+mysqldump -u root -p inventario_tintas > backup_YYYY-MM-DD.sql
+```
+
+Restaurar:
+```bash
+mysql -u root -p inventario_tintas < backup_YYYY-MM-DD.sql
+```
+
+────────────────────────────────────────────────────────────────────────────
+ACTUALIZAR DEPENDENCIAS
+────────────────────────────────────────────────────────────────────────────
+
+```bash
+pip install --upgrade -r requirements.txt
+```
+
+────────────────────────────────────────────────────────────────────────────
+LOGS Y DEBUGGING
+────────────────────────────────────────────────────────────────────────────
+
+En desarrollo (FLASK_ENV=development):
+- Debug mode activado
+- Errores se muestran en navegador
+- Recarga automática al cambiar código
+
+En producción:
+- Configurar logging en run.py:
+  ```python
+  import logging
+  logging.basicConfig(filename='app.log', level=logging.INFO)
+  ```
+
+────────────────────────────────────────────────────────────────────────────
+MIGRACIONES DE BASE DE DATOS
+────────────────────────────────────────────────────────────────────────────
+
+Actualmente: db.create_all() crea tablas automáticamente
+
+Para producción, considerar Flask-Migrate:
+```bash
+pip install Flask-Migrate
+```
+
+Configurar en app/__init__.py:
+```python
+from flask_migrate import Migrate
+migrate = Migrate(app, db)
+```
+
+Comandos:
+```bash
+flask db init                 # Inicializar migraciones
+flask db migrate -m "mensaje" # Crear migración
+flask db upgrade              # Aplicar migración
+```
+
+────────────────────────────────────────────────────────────────────────────
+SEGURIDAD EN PRODUCCIÓN
+────────────────────────────────────────────────────────────────────────────
+
+1. SECRET_KEY: Generar clave fuerte única
+   ```python
+   import secrets
+   secrets.token_hex(32)
+   ```
+
+2. HTTPS: Usar certificado SSL
+
+3. Variables de entorno: No hardcodear credenciales
+
+4. Usuarios: Passwords fuertes, revisar periódicamente
+
+5. Firewall: Restringir acceso a MySQL (solo localhost)
+
+6. Actualizaciones: Mantener dependencias actualizadas
+
+7. WSGI Server: Usar Gunicorn o uWSGI en lugar de Flask dev server
+   ```bash
+   pip install gunicorn
+   gunicorn -w 4 -b 0.0.0.0:5000 run:app
+   ```
+
+================================================================================
+RECURSOS ADICIONALES
+================================================================================
+
+DOCUMENTACIÓN OFICIAL:
+- Flask: https://flask.palletsprojects.com/
+- SQLAlchemy: https://docs.sqlalchemy.org/
+- Jinja2: https://jinja.palletsprojects.com/
+- Bootstrap: https://getbootstrap.com/docs/5.0/
+
+ESTRUCTURA DE CONSULTAS SQLAlchemy:
+- Filtros: Model.query.filter_by(campo=valor)
+- Joins: Model.query.join(OtroModel)
+- Ordenar: query.order_by(Model.campo.desc())
+- Limitar: query.limit(10)
+- Paginar: query.paginate(page=1, per_page=25)
+
+TESTING:
+Considerar agregar pytest:
+```bash
+pip install pytest
+```
+
+Crear tests/ con pruebas unitarias para modelos y rutas.
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================
+
+Para más información o soporte, revisar:
+- README.md: Instrucciones de instalación y uso general
+- Código fuente: Comentarios en cada archivo
+- Git commits: Historial de cambios
+
+Última actualización: Febrero 2026
