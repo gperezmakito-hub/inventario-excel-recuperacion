@@ -1,0 +1,404 @@
+================================================================================
+  GUÍA DE IMPORTACIÓN DESDE EXCEL
+  Sistema de Inventario de Tintas
+================================================================================
+
+RESUMEN:
+Existe un script completo para importar datos desde un archivo Excel a la base
+de datos. Este script se encuentra en: scripts/migrar_excel.py
+
+================================================================================
+1. FORMATO DEL ARCHIVO EXCEL REQUERIDO
+================================================================================
+
+NOMBRE DEL ARCHIVO:
+"INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx"
+
+UBICACIÓN ESPERADA:
+El script busca el archivo en:
+../inventario-excel-recuperacion/INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx
+
+HOJAS REQUERIDAS DEL EXCEL:
+────────────────────────────────────────────────────────────────────────────
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ HOJA 1: "PROVEEDORES"                                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ COLUMNAS (desde columna 0):                                              │
+│                                                                          │
+│ 0.  Nombre/Empresa (obligatorio)                                         │
+│ 1.  NIF                                                                  │
+│ 2.  Dirección                                                            │
+│ 3.  Código Postal                                                        │
+│ 4.  Municipio                                                            │
+│ 5.  Provincia                                                            │
+│ 6.  Teléfono                                                             │
+│ 7.  Web                                                                  │
+│ 10. Email                                                                │
+│ 13. Contacto (nombre)                                                    │
+│ 14. Móvil (del contacto)                                                 │
+│                                                                          │
+│ NOTA: La primera fila debe contener los encabezados                      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ HOJA 2: "BASE DATOS"                                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ IMPORTANTE: Los encabezados están en la FILA 12 (línea 12)               │
+│                                                                          │
+│ COLUMNAS REQUERIDAS:                                                     │
+│                                                                          │
+│ - Código EAN (obligatorio, único)                                        │
+│ - Cod. Provee. (código del proveedor para el producto)                   │
+│ - Proveedor (nombre del proveedor, debe existir en hoja PROVEEDORES)     │
+│ - Zona Stock (ALTILLO, POLIGONO, LABORATORIO, PRINCIPAL)                 │
+│ - Pintura (nombre del producto)                                          │
+│ - Tipo Pintura / Serie (serie o tipo de tinta)                           │
+│ - Color (color del producto)                                             │
+│ - kg. Bote (peso unitario en kilogramos)                                 │
+│ - Nº Botes (stock actual, número de botes/unidades)                      │
+│ - Cant. Min. (stock mínimo, puede ser número o "NO")                     │
+│ - Precio (precio de compra unitario)                                     │
+│ - Dto.1 (descuento 1 en porcentaje)                                      │
+│ - Dto.2 (descuento 2 en porcentaje)                                      │
+│ - SECCIÓN (para categorización automática)                               │
+│                                                                          │
+│ IMPORTANTE:                                                              │
+│ - El script lee desde la fila 12 (header=11 en pandas)                   │
+│ - Los códigos EAN deben ser únicos                                       │
+│ - Los nombres de proveedores deben coincidir exactamente con los         │
+│   de la hoja PROVEEDORES                                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+2. CATEGORIZACIÓN AUTOMÁTICA
+================================================================================
+
+El script detecta automáticamente la categoría del producto según palabras
+clave en el nombre, serie o sección:
+
+DILUYENTE         → Contiene: diluyente, aditivo, retardante
+LIMPIADOR         → Contiene: limpia, wash, clean
+BARNIZ            → Contiene: barniz, laca, varnish
+TINTA SUBLIMACION → Contiene: sublim
+TINTA UV          → Contiene: uv
+TINTA LATEX       → Contiene: latex
+TINTA SOLVENTE    → Contiene: solvent, solvente
+TAMPOGRAFÍA       → Contiene: tampografía, tampo, tp-
+SERIGRAFÍA        → Contiene: serigrafía, serimid, seri
+OTROS             → Todo lo que no coincida con lo anterior
+
+================================================================================
+3. ZONAS DE STOCK VÁLIDAS
+================================================================================
+
+Las siguientes zonas de stock se crean automáticamente:
+
+- ALTILLO          → Zona del altillo
+- POLIGONO         → Almacén del polígono
+- LABORATORIO      → Zona de laboratorio
+- PRINCIPAL        → Almacén principal
+
+IMPORTANTE: En el Excel, la columna "Zona Stock" debe contener uno de estos
+valores (sin importar mayúsculas/minúsculas).
+
+================================================================================
+4. CÓMO EJECUTAR LA IMPORTACIÓN
+================================================================================
+
+PASO 1: PREPARAR EL ARCHIVO EXCEL
+──────────────────────────────────
+1. Asegurarte de que el archivo se llama:
+   "INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx"
+
+2. Colocar el archivo en la ubicación correcta:
+   ../inventario-excel-recuperacion/
+
+   Estructura de carpetas:
+   
+   MAKITO/
+   ├── inventario-excel-recuperacion/
+   │   └── INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx
+   └── inventario-tintas/
+       ├── scripts/
+       │   └── migrar_excel.py
+       └── ...
+
+3. Verificar que las hojas "PROVEEDORES" y "BASE DATOS" existen
+
+PASO 2: EJECUTAR EL SCRIPT
+───────────────────────────
+Desde la carpeta raíz del proyecto (inventario-tintas):
+
+Windows:
+    .venv\Scripts\activate
+    python scripts\migrar_excel.py
+
+Linux/Mac:
+    source .venv/bin/activate
+    python scripts/migrar_excel.py
+
+PASO 3: VERIFICAR LA IMPORTACIÓN
+─────────────────────────────────
+El script mostrará:
+- Número de proveedores importados
+- Número de productos importados
+- Errores encontrados (si los hay)
+- Usuarios creados por defecto
+
+Ejemplo de salida:
+════════════════════════════════════════════════════════════
+🔄 MIGRACIÓN DE DATOS EXCEL A SQLITE
+════════════════════════════════════════════════════════════
+
+📄 Archivo: ../inventario-excel-recuperacion/INVENTARIO...
+
+🗄️  Creando tablas de base de datos...
+
+👤 Creando usuarios...
+   ✓ Usuario: admin
+   ✓ Usuario: almacen
+   ✓ Usuario: oficina
+
+📂 Creando categorías...
+   Total: 10 categorías
+
+📍 Creando zonas de stock...
+   Total: 4 zonas
+
+📦 Importando proveedores...
+   ✓ Proveedor: EMPRESA 1
+   ✓ Proveedor: EMPRESA 2
+   ...
+   Total: 25 proveedores importados
+
+🎨 Importando productos desde BASE DATOS...
+   Columnas encontradas: ['Código EAN', 'Cod. Provee.', ...]
+   Total filas: 450
+   ... 100 productos procesados
+   ... 200 productos procesados
+   ...
+   ✓ Total: 425 productos importados (5 errores)
+
+════════════════════════════════════════════════════════════
+✅ MIGRACIÓN COMPLETADA
+════════════════════════════════════════════════════════════
+
+Usuarios creados:
+  - admin / admin123 (Administrador)
+  - almacen / almacen123 (Almacén)
+  - oficina / oficina123 (Oficina)
+
+Resumen de datos:
+  - 425 productos
+  - 25 proveedores
+  - 10 categorías
+
+Ahora puedes ejecutar la aplicación con: python run.py
+
+================================================================================
+5. IMPORTACIÓN INCREMENTAL (ACTUALIZAR DATOS)
+================================================================================
+
+COMPORTAMIENTO ACTUAL:
+- El script NO sobrescribe datos existentes
+- Si un código EAN ya existe, se omite
+- Si un proveedor ya existe, se omite
+
+PARA ACTUALIZAR TODOS LOS DATOS:
+1. Hacer backup de la base de datos actual
+2. Eliminar la base de datos (o renombrarla)
+3. Ejecutar el script de nuevo
+
+BACKUP DE LA BASE DE DATOS:
+
+MySQL:
+    mysqldump -u root -p inventario_tintas > backup_YYYY-MM-DD.sql
+
+SQLite (si se usa):
+    Copiar el archivo .db a un lugar seguro
+
+ELIMINAR Y RECREAR BASE DE DATOS:
+
+MySQL:
+    DROP DATABASE inventario_tintas;
+    CREATE DATABASE inventario_tintas 
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+================================================================================
+6. MODIFICAR UBICACIÓN DEL EXCEL
+================================================================================
+
+Si tu archivo Excel está en otra ubicación, edita el script:
+
+Archivo: scripts/migrar_excel.py
+Líneas: 27-31
+
+CAMBIAR DE:
+```python
+EXCEL_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    'inventario-excel-recuperacion',
+    'INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx'
+)
+```
+
+A UNA RUTA FIJA:
+```python
+EXCEL_FILE = r'C:\Ruta\Completa\A\Tu\Archivo.xlsx'
+```
+
+O RUTA RELATIVA:
+```python
+EXCEL_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    'mi_archivo.xlsx'
+)
+```
+
+================================================================================
+7. PROBLEMAS COMUNES Y SOLUCIONES
+================================================================================
+
+PROBLEMA: "Error: No se encuentra el archivo Excel"
+SOLUCIÓN: 
+- Verificar que la ruta del archivo sea correcta
+- Verificar que el nombre del archivo coincida exactamente
+- Usar ruta absoluta en vez de relativa si es necesario
+
+PROBLEMA: "Error leyendo hoja PROVEEDORES"
+SOLUCIÓN:
+- Verificar que la hoja se llame exactamente "PROVEEDORES"
+- Revisar que no esté protegida con contraseña
+- Verificar que tenga encabezados en la primera fila
+
+PROBLEMA: "Error leyendo hoja BASE DATOS"
+SOLUCIÓN:
+- Verificar que la hoja se llame exactamente "BASE DATOS"
+- Confirmar que los encabezados estén en la fila 12
+- Revisar que las columnas tengan los nombres correctos
+
+PROBLEMA: Muchos productos se omiten (ya existen)
+SOLUCIÓN:
+- Hacer backup de la BD
+- Eliminar la base de datos
+- Ejecutar el script de nuevo
+
+PROBLEMA: "Error en fila X: ..."
+SOLUCIÓN:
+- Revisar esa fila específica en el Excel
+- Verificar que los datos estén en el formato correcto
+- El script continuará importando las demás filas
+
+PROBLEMA: Productos sin proveedor
+SOLUCIÓN:
+- Verificar que el nombre del proveedor en "BASE DATOS" coincida
+  EXACTAMENTE con el de la hoja "PROVEEDORES"
+- Los espacios y mayúsculas/minúsculas importan
+
+PROBLEMA: Stock mínimo no se importa
+SOLUCIÓN:
+- Si la celda contiene "NO", se establecerá stock mínimo = 0
+- Si está vacía, se establecerá stock mínimo = 0
+- Debe ser un número para que se importe correctamente
+
+================================================================================
+8. QUÉ DATOS SE IMPORTAN Y CUÁLES NO
+================================================================================
+
+✅ SE IMPORTAN:
+- Proveedores completos (con todos sus datos)
+- Productos completos (con stock actual)
+- Categorías automáticas
+- Zonas de stock
+- Usuarios por defecto
+
+❌ NO SE IMPORTAN:
+- Historial de entradas (el stock actual ya está en los productos)
+- Historial de salidas
+- Solicitudes de compra antiguas
+- Movimientos históricos
+
+NOTA: Una vez importados los datos, los movimientos futuros se registrarán
+normalmente en la aplicación.
+
+================================================================================
+9. USUARIOS CREADOS AUTOMÁTICAMENTE
+================================================================================
+
+El script crea 3 usuarios por defecto:
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Usuario: admin                                                          │
+│ Contraseña: admin123                                                    │
+│ Rol: Administrador                                                      │
+│ Permisos: Todos                                                         │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Usuario: almacen                                                        │
+│ Contraseña: almacen123                                                  │
+│ Rol: Almacén                                                            │
+│ Permisos: Crear solicitudes, registrar entradas/salidas                 │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│ Usuario: oficina                                                        │
+│ Contraseña: oficina123                                                  │
+│ Rol: Oficina                                                            │
+│ Permisos: Aprobar compras, editar productos, reportes                   │
+└────────────────────────────────────────────────────────────────────────┘
+
+IMPORTANTE: Cambiar estas contraseñas después de la primera importación.
+
+================================================================================
+10. EJEMPLO COMPLETO DE FLUJO DE TRABAJO
+================================================================================
+
+ESCENARIO: Tienes un nuevo Excel actualizado y quieres cargar todos los datos
+
+1. Hacer backup de la base de datos actual:
+   
+   mysqldump -u root -p inventario_tintas > backup_2026-02-12.sql
+
+2. Preparar el archivo Excel:
+   
+   - Nombre: INVENTARIO TINTAS PUBLINDAL_RECUPERADO.xlsx
+   - Ubicación: ../inventario-excel-recuperacion/
+   - Verificar hojas: PROVEEDORES, BASE DATOS
+
+3. Eliminar base de datos actual (opcional, si quieres empezar de cero):
+   
+   mysql -u root -p
+   DROP DATABASE inventario_tintas;
+   CREATE DATABASE inventario_tintas 
+   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   exit
+
+4. Ejecutar importación:
+   
+   cd C:\Users\gonza\OneDrive\Documents\MAKITO\inventario-tintas
+   .venv\Scripts\activate
+   python scripts\migrar_excel.py
+
+5. Verificar resultados:
+   
+   - Revisar la salida del script
+   - Iniciar la aplicación: python run.py
+   - Login con admin/admin123
+   - Verificar productos importados
+
+6. Cambiar contraseñas de usuarios por seguridad
+
+7. Comenzar a usar la aplicación normalmente
+
+================================================================================
+FIN DE LA GUÍA
+================================================================================
+
+Para más información técnica, consultar:
+- DOCUMENTACION_TECNICA.txt
+- README.md
+- Código fuente: scripts/migrar_excel.py
+
+Última actualización: Febrero 2026
