@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -82,12 +82,19 @@ class Movimiento(db.Model):
 # Rutas
 @app.route('/')
 def index():
+    """Servir la interfaz web"""
+    return render_template('index.html')
+
+@app.route('/api')
+def api_info():
+    """Información de la API"""
     return jsonify({
         'message': 'API Inventario Tintas - MKTO CATAL IMPORTACIONES',
         'version': '1.0.0',
         'endpoints': {
             'productos': '/api/productos',
             'movimientos': '/api/movimientos',
+            'estadisticas': '/api/estadisticas',
             'health': '/health'
         }
     })
@@ -242,7 +249,7 @@ def get_estadisticas():
         return jsonify({
             'total_productos': total_productos,
             'productos_bajo_stock': productos_bajo_stock,
-            'valor_total_inventario': round(valor_total, 2)
+            'valor_total': round(valor_total, 2)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
