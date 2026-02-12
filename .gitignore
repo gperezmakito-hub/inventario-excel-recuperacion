@@ -23,6 +23,8 @@ Thumbs.db
 # Project specific
 *.log
 *.tmp
+.env
+logs/
 
 # Archivos temporales Excel
 excel_extraido/
